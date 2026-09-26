@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+ postgres:
+ image: postgres:15-alpine
+ container_name: it_helpdesk_postgres
+ restart: always
+ environment:
+ POSTGRES_USER: postgres
+ POSTGRES_PASSWORD: postgrespassword
+ POSTGRES_DB: it_helpdesk_db
+ ports:
+ - "5432:5432"
+ volumes:
+ - postgres_data:/var/lib/postgresql/data
+ healthcheck:
+ test: ["CMD-SHELL", "pg_isready -U postgres -d it_helpdesk_db"]
+ interval: 5s
+ timeout: 5s
+ retries: 5
+
+ backend:
+ build:
+ context: ./backend
+ dockerfile: Dockerfile
+ container_name: it_helpdesk_backend
+ restart: always
+ environment:
+ PORT: 5002
+ DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/it_helpdesk_db?schema=public"
+ JWT_SECRET: "enterprise_super_secret_jwt_key_2026"
+ CORS_ORIGIN: "http://localhost:5175"
+ ports:
+ - "5002:5002"
+ depends_on:
+ postgres:
+ condition: service_healthy
+
+ frontend:
+ build:
+ context: ./frontend
+ dockerfile: Dockerfile
+ container_name: it_helpdesk_frontend
+ restart: always
+ ports:
+ - "80:80"
+ depends_on:
+ - backend
+
+volumes:
+ postgres_data:
