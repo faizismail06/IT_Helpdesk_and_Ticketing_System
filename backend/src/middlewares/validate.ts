@@ -2,10 +2,21 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodSchema, ZodError } from 'zod';
 import { sendError } from '../utils/response';
 
-export const validate = (schema: ZodSchema) => {
+type ValidationSource = 'body' | 'query' | 'params';
+
+export const validate = (schema: ZodSchema, source: ValidationSource = 'body') => {
  return (req: Request, res: Response, next: NextFunction): void => {
  try {
- req.body = schema.parse(req.body);
+ const parsed = schema.parse(req[source]);
+
+ if (source === 'body') {
+ req.body = parsed;
+ } else if (source === 'query') {
+ Object.keys(req.query).forEach((key) => delete req.query[key]);
+ Object.assign(req.query, parsed);
+ } else {
+ Object.assign(req.params, parsed);
+ }
  next();
  } catch (err) {
  if (err instanceof ZodError) {

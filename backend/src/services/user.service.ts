@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { RoleName } from '@prisma/client';
+import { AuditLogService } from './auditLog.service';
 
 export class UserService {
  static async listUsers(role?: RoleName, departmentId?: string) {
@@ -30,13 +31,13 @@ export class UserService {
  });
  }
 
- static async updateUserStatus(userId: string, isActive: boolean) {
+ static async updateUserStatus(userId: string, isActive: boolean, actorId?: string) {
  const user = await prisma.user.findUnique({ where: { id: userId } });
  if (!user) {
  throw { statusCode: 404, message: 'User not found' };
  }
 
- return prisma.user.update({
+ const updated = await prisma.user.update({
  where: { id: userId },
  data: { isActive },
  select: {
@@ -47,5 +48,7 @@ export class UserService {
  isActive: true,
  },
  });
+ await AuditLogService.logAction(actorId || null, `User account ${isActive ? 'activated' : 'deactivated'}`, 'USER_MGMT', userId);
+ return updated;
  }
 }

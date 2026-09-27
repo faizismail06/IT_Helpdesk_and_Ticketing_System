@@ -80,4 +80,7 @@ export const adminApi = {
  const res = await api.get('/departments');
  return res.data.data;
  },
+ getCategories: async (): Promise<any[]> => (await api.get('/admin/categories')).data.data,
+ createCategory: async (data: { name: string; description?: string }) => (await api.post('/admin/categories', data)).data.data,
+ updateCategory: async (id: string, data: { name?: string; description?: string; isActive?: boolean }) => (await api.patch(`/admin/categories/${id}`, data)).data.data,
 };

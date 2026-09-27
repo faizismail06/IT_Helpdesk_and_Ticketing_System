@@ -1,9 +1,11 @@
 import { prisma } from '../config/db';
 import { JwtPayload } from '../types';
 import { RoleName, TicketStatus } from '@prisma/client';
+import { SlaService } from './sla.service';
 
 export class DashboardService {
  static async getStats(user: JwtPayload) {
+ await SlaService.syncOverdueTickets();
  const { userId, role } = user;
 
  if (role === RoleName.EMPLOYEE) {
@@ -100,16 +102,25 @@ export class DashboardService {
  count: item._count._all,
  }));
 
- // Mock trend for last 7 days chart
- const volumeTrend = [
- { day: 'Mon', tickets: 6 },
- { day: 'Tue', tickets: 12 },
- { day: 'Wed', tickets: 9 },
- { day: 'Thu', tickets: 15 },
- { day: 'Fri', tickets: 11 },
- { day: 'Sat', tickets: 4 },
- { day: 'Sun', tickets: 2 },
- ];
+ const today = new Date();
+ today.setHours(23, 59, 59, 999);
+ const start = new Date(today);
+ start.setDate(start.getDate() - 6);
+ start.setHours(0, 0, 0, 0);
+ const recentTickets = await prisma.ticket.findMany({
+ where: { createdAt: { gte: start, lte: today } },
+ select: { createdAt: true },
+ });
+ const volumeTrend = Array.from({ length: 7 }, (_, index) => {
+ const date = new Date(start);
+ date.setDate(start.getDate() + index);
+ const key = date.toISOString().slice(0, 10);
+ return {
+ day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+ date: key,
+ tickets: recentTickets.filter((ticket) => ticket.createdAt.toISOString().slice(0, 10) === key).length,
+ };
+ });
 
  return {
  total,

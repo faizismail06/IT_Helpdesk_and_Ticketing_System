@@ -1,4 +1,6 @@
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type TicketImpact = 'INDIVIDUAL' | 'TEAM' | 'DEPARTMENT' | 'ORGANIZATION';
+export type TicketUrgency = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export type TicketStatus =
  | 'NEW'
@@ -57,6 +59,15 @@ export interface TicketComment {
  createdAt: string;
 }
 
+export interface TicketAttachment {
+ id: string;
+ originalFilename: string;
+ mimeType: string;
+ fileSize: number;
+ uploadedById: string;
+ uploadedAt: string;
+}
+
 export interface TicketHistory {
  id: string;
  action: string;
@@ -77,7 +88,11 @@ export interface Ticket {
  description: string;
  categoryId: string;
  category: TicketCategory;
+ impact: TicketImpact;
+ urgency: TicketUrgency;
+ suggestedPriority: TicketPriority;
  priority: TicketPriority;
+ isPriorityReviewed: boolean;
  status: TicketStatus;
  requesterId: string;
  requester: TicketRequester;
@@ -88,7 +103,13 @@ export interface Ticket {
  updatedAt: string;
  assignments?: TicketAssignment[];
  comments?: TicketComment[];
+ attachments?: TicketAttachment[];
  history?: TicketHistory[];
+ rating?: {
+ id: string;
+ score: number;
+ feedback?: string | null;
+ } | null;
 }
 
 export interface TicketPagination {

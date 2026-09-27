@@ -22,6 +22,6 @@ router.post(
  WorkflowController.assignTechnician
 );
 router.post('/tickets/:id/comments', validate(addCommentSchema), WorkflowController.addComment);
-router.post('/tickets/:id/rating', RatingController.submitRating);
+router.post('/tickets/:id/rating', authorizeRoles(RoleName.EMPLOYEE), RatingController.submitRating);
 
 export default router;

@@ -6,13 +6,16 @@ import { Button } from '../../components/ui/Button';
 import { Headset, Users, ShieldAlert, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const HelpdeskDashboard: React.FC = () => {
  const navigate = useNavigate();
+ const { user } = useAuth();
 
- const { data: stats, isLoading } = useQuery({
- queryKey: ['dashboard-stats'],
+ const { data: stats, isLoading, isError, error, refetch } = useQuery({
+ queryKey: ['dashboard', user?.id, user?.role],
  queryFn: dashboardApi.getStats,
+ enabled: Boolean(user),
  });
 
  if (isLoading) {
@@ -20,6 +23,16 @@ export const HelpdeskDashboard: React.FC = () => {
  <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-2 text-slate-400">
  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
  <p className="text-xs">Loading live operational stats...</p>
+ </div>
+ );
+ }
+
+ if (isError) {
+ return (
+ <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 text-center">
+ <AlertTriangle className="w-8 h-8 text-rose-400" />
+ <div><h2 className="text-sm font-semibold text-white">Unable to load helpdesk queue</h2><p className="text-xs text-slate-400">{(error as any)?.response?.data?.message || 'The server could not return dashboard data.'}</p></div>
+ <Button variant="secondary" size="sm" onClick={() => refetch()}>Retry</Button>
  </div>
  );
  }

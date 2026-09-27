@@ -1,42 +1,19 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { kbApi, KnowledgeArticle } from '../../api/kb';
-import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { BookOpen, Search, PlusCircle, Eye, Tag, X, FileText, Loader2, Sparkles } from 'lucide-react';
+import { BookOpen, Search, Eye, Tag, X, FileText, Loader2 } from 'lucide-react';
 
 export const KnowledgeBasePage: React.FC = () => {
- const { user } = useAuth();
- const queryClient = useQueryClient();
  const [searchQuery, setSearchQuery] = useState('');
  const [selectedCategory, setSelectedCategory] = useState('');
  const [activeArticle, setActiveArticle] = useState<KnowledgeArticle | null>(null);
- const [isCreateOpen, setIsCreateOpen] = useState(false);
-
- // New Article Form State
- const [title, setTitle] = useState('');
- const [category, setCategory] = useState('Account & Access');
- const [content, setContent] = useState('');
- const [tags, setTags] = useState('password, outlook');
 
  const { data: articles = [], isLoading } = useQuery({
  queryKey: ['kb-articles', searchQuery, selectedCategory],
  queryFn: () => kbApi.getArticles(searchQuery, selectedCategory),
  });
-
- const createMutation = useMutation({
- mutationFn: kbApi.createArticle,
- onSuccess: () => {
- queryClient.invalidateQueries({ queryKey: ['kb-articles'] });
- setIsCreateOpen(false);
- setTitle('');
- setContent('');
- },
- });
-
- const isStaff = ['HELPDESK', 'TECHNICIAN', 'ADMIN'].includes(user?.role || '');
 
  const categoriesList = [
  'Account & Access',
@@ -46,17 +23,6 @@ export const KnowledgeBasePage: React.FC = () => {
  'Software Bug & License',
  'Email & Communication',
  ];
-
- const handleCreateSubmit = (e: React.FormEvent) => {
- e.preventDefault();
- if (!title.trim() || !content.trim()) return;
- createMutation.mutate({
- title,
- category,
- content,
- tags: tags.split(',').map((t) => t.trim()),
- });
- };
 
  return (
  <div className="space-y-6 animate-in fade-in duration-200">
@@ -72,11 +38,6 @@ export const KnowledgeBasePage: React.FC = () => {
  </p>
  </div>
 
- {isStaff && (
- <Button variant="primary" size="sm" onClick={() => setIsCreateOpen(true)}>
- <PlusCircle className="w-4 h-4" /> Create Article
- </Button>
- )}
  </div>
 
  {/* Search & Category Pills */}
@@ -203,84 +164,6 @@ export const KnowledgeBasePage: React.FC = () => {
  </div>
  )}
 
- {/* Article Creator Modal */}
- {isCreateOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
- <div className="w-full max-w-xl bg-[#111726] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4 relative">
- <button
- onClick={() => setIsCreateOpen(false)}
- className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg"
- >
- <X className="w-5 h-5" />
- </button>
-
- <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
- <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
- <Sparkles className="w-5 h-5" />
- </div>
- <div>
- <h2 className="text-base font-bold text-white">Create Knowledge Base Article</h2>
- <p className="text-xs text-slate-400">Publish troubleshooting guide for self-service deflection</p>
- </div>
- </div>
-
- <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
- <Input
- label="Article Title *"
- placeholder="e.g. How to configure corporate Email on iOS & Android"
- value={title}
- onChange={(e) => setTitle(e.target.value)}
- />
-
- <div>
- <label className="block text-slate-400 font-semibold mb-1 uppercase text-[10px]">Category *</label>
- <select
- value={category}
- onChange={(e) => setCategory(e.target.value)}
- className="w-full bg-[#090d16] border border-slate-800 text-slate-100 rounded-lg p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
- >
- {categoriesList.map((cat) => (
- <option key={cat} value={cat}>
- {cat}
- </option>
- ))}
- </select>
- </div>
-
- <div>
- <label className="block text-slate-400 font-semibold mb-1 uppercase text-[10px]">Tags (Comma separated)</label>
- <input
- type="text"
- value={tags}
- onChange={(e) => setTags(e.target.value)}
- placeholder="e.g. mobile, email, setup"
- className="w-full bg-[#090d16] border border-slate-800 text-slate-100 rounded-lg p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
- />
- </div>
-
- <div>
- <label className="block text-slate-400 font-semibold mb-1 uppercase text-[10px]">Article Content (Steps) *</label>
- <textarea
- rows={6}
- value={content}
- onChange={(e) => setContent(e.target.value)}
- placeholder="Step 1: Open device settings...\nStep 2: Add Exchange Account..."
- className="w-full bg-[#090d16] border border-slate-800 text-slate-100 rounded-lg p-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
- />
- </div>
-
- <div className="pt-2 flex items-center gap-2">
- <Button type="button" variant="outline" className="w-1/2" onClick={() => setIsCreateOpen(false)}>
- Cancel
- </Button>
- <Button type="submit" variant="primary" className="w-1/2" isLoading={createMutation.isPending}>
- Publish Article
- </Button>
- </div>
- </form>
- </div>
- </div>
- )}
  </div>
  );
 };

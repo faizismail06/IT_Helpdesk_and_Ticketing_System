@@ -6,13 +6,15 @@
 | Document Attribute | Value |
 | :--- | :--- |
 | **Project Title** | Enterprise IT Helpdesk & Ticketing System |
-| **Document Version** | 1.0.0 |
-| **Status** | Approved for Development |
+| **Document Version** | 1.1.0 |
+| **Status** | Implemented Baseline + Future Requirements |
 | **Author** | Full-Stack Software Engineer |
 | **Target Platform** | Web (Desktop-first Responsive Enterprise Web App) |
 | **Tech Stack** | React (Vite + TS) + Express.js (TS) + PostgreSQL (Prisma) + Socket.IO |
 
 ---
+
+> Implementation note: this PRD contains both implemented requirements and future scope. For current behavior, setup, RBAC, endpoints, and known limitations, use `README.md` and the files in `docs/` as the source of truth.
 
 ## 1. Executive Summary & Project Objectives
 
@@ -23,11 +25,11 @@ The **Enterprise IT Helpdesk & Ticketing System** is a robust, production-grade 
 
 ### 1.2 Core Objectives
 - **Systematic Ticket Triage & Resolution**: Standardized lifecycle workflow with strict state transitions preventing invalid status jumps.
-- **SLA Tracking & Breach Prevention**: Dynamic SLA calculation engines (Low, Medium, High, Critical) with realtime countdowns and automated breach flags.
+- **SLA Tracking & Breach Prevention**: Dynamic SLA deadlines and realtime countdown displays. A scheduled worker for periodic overdue updates remains future scope.
 - **Multi-Role RBAC**: 4 granular user roles (Employee, Helpdesk, Technician, Admin) with enforced server-side authorization.
 - **Realtime Incident Communication**: Instant notification dispatch using Socket.IO alongside persisted in-app notifications and detailed ticket activity logs.
 - **Knowledge Base Integration**: Self-service deflection to reduce redundant IT ticket creation.
-- **Data-Driven Performance Analytics**: Comprehensive dashboards for each role and exportable reports (PDF/Excel) for IT management.
+- **Data-Driven Performance Analytics**: Role-specific dashboards and structured `.xlsx` report export for Helpdesk and Admin.
 
 ---
 
@@ -44,7 +46,7 @@ The **Enterprise IT Helpdesk & Ticketing System** is a robust, production-grade 
 
 | Feature / Action | Employee | Helpdesk | Technician | Admin |
 | :--- | :---: | :---: | :---: | :---: |
-| **Create Ticket** | [x] | [x] | [x] | [x] |
+| **Create Ticket** | [x] | [ ] | [ ] | [ ] |
 | **View Own Tickets** | [x] | [x] | [x] | [x] |
 | **View All Tickets** | [ ] | [x] | [ ] (Only Assigned/Allowed) | [x] |
 | **Triage & Assign Ticket** | [ ] | [x] | [ ] | [x] |
@@ -52,10 +54,10 @@ The **Enterprise IT Helpdesk & Ticketing System** is a robust, production-grade 
 | **Execute Ticket Status Transition** | Restricted (Reopen) | [x] | Allowed (Assigned) | [x] |
 | **Post Public Comments** | [x] | [x] | [x] | [x] |
 | **Log Resolution & Work Effort** | [ ] | [ ] | [x] | [x] |
-| **Upload Attachments** | [x] | [x] | [x] | [x] |
+| **Upload Attachments** | Future | Future | Future | Future |
 | **Submit Ticket Rating & Feedback** | [x] (Own Ticket) | [ ] | [ ] | [ ] |
-| **Manage Knowledge Base (Create/Edit)** | [ ] | [x] | [x] | [x] |
-| **View Knowledge Base** | [x] | [x] | [x] | [x] |
+| **Manage Knowledge Base (Create/Edit)** | [ ] | [ ] | [ ] | [ ] (Future) |
+| **View Knowledge Base** | [x] | [ ] | [ ] | [ ] |
 | **View SLA Deadlines & Breach Status** | [x] (View) | [x] | [x] | [x] |
 | **Manage SLA Rules & Categories** | [ ] | [ ] | [ ] | [x] |
 | **User & Role Management** | [ ] | [ ] | [ ] | [x] |
@@ -678,7 +680,7 @@ The development process is structured into **10 sequential phases**. Each phase 
 ---
 
 ### Phase 7: Role Dashboards, Analytics & Exportable Reports
-- **Goal**: Build role-tailored metrics dashboards and PDF/Excel report generator.
+- **Goal**: Build role-tailored metrics dashboards and structured Excel report generation.
 - **Tasks**:
  1. Build Employee, Helpdesk, Technician, and Admin dashboards with Recharts integration.
  2. Build filtering controls (date, priority, department, technician).
@@ -736,7 +738,7 @@ To ensure effortless evaluation for technical recruiters and portfolio reviewers
 The system is declared fully compliant and complete when:
 1. [x] **Auth & RBAC**: Users log in securely; routes and endpoints enforce role authorization without permission bypasses.
 2. [x] **Deterministic Workflow**: Tickets transition strictly according to state machine logic (`NEW` -> `OPEN` -> `IN_PROGRESS` -> `RESOLVED` -> `CLOSED`).
-3. [x] **Automatic SLA Engine**: SLA deadlines auto-calculate upon creation and overdue tickets are flagged dynamically.
+3. [~] **SLA Engine**: Deadlines calculate on creation/triage; a scheduled overdue worker remains future scope.
 4. [x] **Realtime Socket Sync**: Status updates, comments, and assignments propagate instantly to active client browsers.
 5. [x] **Non-Editable History & Audit Trail**: Every change creates immutable audit records with timestamps and actor metadata.
 6. [x] **Enterprise Design**: The UI features dark mode slate typography, crisp monospaced IDs, micro-indicators, and responsive density without "AI-slop" visual elements.

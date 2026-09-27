@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Shield, KeyRound, Mail, AlertCircle, Sparkles } from 'lucide-react';
+import { Shield, KeyRound, Mail, AlertCircle } from 'lucide-react';
 import { api } from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -26,13 +26,12 @@ export const LoginPage: React.FC = () => {
  const {
  register,
  handleSubmit,
- setValue,
  formState: { errors },
  } = useForm<LoginFormValues>({
  resolver: zodResolver(loginSchema),
  defaultValues: {
- email: 'helpdesk@company.com',
- password: 'Helpdesk123!',
+ email: '',
+ password: '',
  },
  });
 
@@ -65,12 +64,6 @@ export const LoginPage: React.FC = () => {
  } finally {
  setIsLoading(false);
  }
- };
-
- const handleQuickFill = (email: string, pass: string) => {
- setValue('email', email);
- setValue('password', pass);
- setErrorMsg(null);
  };
 
  return (
@@ -122,47 +115,6 @@ export const LoginPage: React.FC = () => {
  </Button>
  </form>
 
- {/* Quick Demo Credentials Switcher */}
- <div className="mt-6 pt-5 border-t border-slate-800/80">
- <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3 font-semibold uppercase tracking-wider">
- <Sparkles className="w-3.5 h-3.5 text-amber-400" />
- <span>Demo Account Quick Selector</span>
- </div>
- <div className="grid grid-cols-2 gap-2 text-xs">
- <button
- type="button"
- onClick={() => handleQuickFill('budi.employee@company.com', 'User123!')}
- className="px-2.5 py-1.5 rounded-md bg-[#1a2236] hover:bg-[#25304c] text-slate-300 text-left border border-slate-700/50 transition-colors"
- >
- <div className="font-semibold text-slate-200">Employee</div>
- <div className="text-[10px] text-slate-400 truncate">budi.employee@...</div>
- </button>
- <button
- type="button"
- onClick={() => handleQuickFill('helpdesk@company.com', 'Helpdesk123!')}
- className="px-2.5 py-1.5 rounded-md bg-[#1a2236] hover:bg-[#25304c] text-slate-300 text-left border border-slate-700/50 transition-colors"
- >
- <div className="font-semibold text-blue-400">Helpdesk (Triage)</div>
- <div className="text-[10px] text-slate-400 truncate">helpdesk@...</div>
- </button>
- <button
- type="button"
- onClick={() => handleQuickFill('technician.ahmad@company.com', 'Tech123!')}
- className="px-2.5 py-1.5 rounded-md bg-[#1a2236] hover:bg-[#25304c] text-slate-300 text-left border border-slate-700/50 transition-colors"
- >
- <div className="font-semibold text-amber-400">Technician</div>
- <div className="text-[10px] text-slate-400 truncate">technician.ahmad@...</div>
- </button>
- <button
- type="button"
- onClick={() => handleQuickFill('admin@company.com', 'Admin123!')}
- className="px-2.5 py-1.5 rounded-md bg-[#1a2236] hover:bg-[#25304c] text-slate-300 text-left border border-slate-700/50 transition-colors"
- >
- <div className="font-semibold text-emerald-400">Admin</div>
- <div className="text-[10px] text-slate-400 truncate">admin@...</div>
- </button>
- </div>
- </div>
  </Card>
 
  <p className="text-center text-xs text-slate-500">

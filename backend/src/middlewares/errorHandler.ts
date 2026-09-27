@@ -8,10 +8,12 @@ export const errorHandler = (
  // eslint-disable-next-line @typescript-eslint/no-unused-vars
  next: NextFunction
 ): void => {
- console.error('[Unhandled Error]:', err);
-
  const statusCode = err.statusCode || err.status || 500;
  const message = err.message || 'Internal Server Error';
+
+ if (statusCode >= 500) {
+ console.error('[Unhandled Error]:', err);
+ }
 
  sendError(res, message, statusCode);
 };

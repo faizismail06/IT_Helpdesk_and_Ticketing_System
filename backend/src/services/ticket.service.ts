@@ -1,15 +1,19 @@
 import { prisma } from '../config/db';
 import { generateTicketNumber } from '../utils/ticketNumber';
-import { CreateTicketInput, TicketQueryInput } from '../validators/ticket.validator';
+import { CreateTicketInput, TicketQueryInput, UpdateTicketInput } from '../validators/ticket.validator';
 import { JwtPayload } from '../types';
 import { TicketStatus, RoleName } from '@prisma/client';
 import { createAndEmitNotification, emitToRoom } from '../socket';
+import { calculateSuggestedPriority } from '../utils/ticketPriority';
+import { AuditLogService } from './auditLog.service';
 
 export class TicketService {
  static async createTicket(requester: JwtPayload, input: CreateTicketInput) {
- // 1. Fetch SLA Rule for selected priority
+ const suggestedPriority = calculateSuggestedPriority(input.impact, input.urgency);
+
+ // 1. Fetch SLA Rule for the system-suggested priority.
  const slaRule = await prisma.slaRule.findUnique({
- where: { priority: input.priority },
+ where: { priority: suggestedPriority },
  });
 
  const resolutionHours = slaRule ? slaRule.resolutionHours : 24; // Default fallback 24h
@@ -27,7 +31,10 @@ export class TicketService {
  subject: input.subject,
  description: input.description,
  categoryId: input.categoryId,
- priority: input.priority,
+ impact: input.impact,
+ urgency: input.urgency,
+ suggestedPriority,
+ priority: suggestedPriority,
  status: TicketStatus.NEW,
  requesterId: requester.userId,
  slaDeadline,
@@ -52,7 +59,7 @@ export class TicketService {
  actorId: requester.userId,
  action: 'CREATED',
  oldValue: null,
- newValue: `Ticket created with status NEW and priority ${input.priority}`,
+ newValue: `Ticket created as NEW; suggested priority ${suggestedPriority} from ${input.impact} impact and ${input.urgency} urgency`,
  },
  });
 
@@ -66,6 +73,7 @@ export class TicketService {
  `Ticket ${ticket.ticketNumber} created successfully.`,
  ticket.id
  );
+ await AuditLogService.logAction(requester.userId, 'Ticket created', 'TICKET', ticket.id, { ticketNumber: ticket.ticketNumber });
 
  // Notify Helpdesk team room
  emitToRoom(
@@ -79,6 +87,37 @@ export class TicketService {
  );
 
  return ticket;
+ }
+
+ static async updateTicket(ticketId: string, requester: JwtPayload, input: UpdateTicketInput) {
+ const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+ if (!ticket) throw { statusCode: 404, message: 'Ticket not found' };
+ if (requester.role !== RoleName.EMPLOYEE || ticket.requesterId !== requester.userId) throw { statusCode: 403, message: 'Only the requester can edit this ticket' };
+ if (ticket.status !== TicketStatus.NEW) throw { statusCode: 400, message: 'Only NEW tickets can be edited' };
+ const impact = input.impact ?? ticket.impact;
+ const urgency = input.urgency ?? ticket.urgency;
+ const suggestedPriority = calculateSuggestedPriority(impact, urgency);
+ const slaRule = await prisma.slaRule.findUnique({ where: { priority: suggestedPriority } });
+ const updated = await prisma.ticket.update({
+ where: { id: ticketId },
+ data: { ...input, impact, urgency, suggestedPriority, priority: suggestedPriority, slaDeadline: new Date(ticket.createdAt.getTime() + (slaRule?.resolutionHours ?? 24) * 3_600_000) },
+ });
+ await prisma.ticketHistory.create({ data: { ticketId, actorId: requester.userId, action: 'UPDATED', newValue: 'Requester updated ticket details' } });
+ await AuditLogService.logAction(requester.userId, 'Ticket updated by requester', 'TICKET', ticketId);
+ emitToRoom('role_helpdesk', 'ticket:updated', { ticketId });
+ return updated;
+ }
+
+ static async cancelTicket(ticketId: string, requester: JwtPayload) {
+ const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+ if (!ticket) throw { statusCode: 404, message: 'Ticket not found' };
+ if (requester.role !== RoleName.EMPLOYEE || ticket.requesterId !== requester.userId) throw { statusCode: 403, message: 'Only the requester can cancel this ticket' };
+ if (ticket.status !== TicketStatus.NEW) throw { statusCode: 400, message: 'Only NEW tickets can be cancelled' };
+ const updated = await prisma.ticket.update({ where: { id: ticketId }, data: { status: TicketStatus.CLOSED } });
+ await prisma.ticketHistory.create({ data: { ticketId, actorId: requester.userId, action: 'CANCELLED', oldValue: TicketStatus.NEW, newValue: TicketStatus.CLOSED } });
+ await AuditLogService.logAction(requester.userId, 'Ticket cancelled by requester', 'TICKET', ticketId);
+ emitToRoom('role_helpdesk', 'ticket:status_changed', { ticketId, oldStatus: TicketStatus.NEW, newStatus: TicketStatus.CLOSED });
+ return updated;
  }
 
  static async getTickets(currentUser: JwtPayload, query: TicketQueryInput) {
@@ -108,11 +147,13 @@ export class TicketService {
  }
 
  const where = {
- ...roleWhere,
- ...searchWhere,
- ...(status && { status }),
- ...(priority && { priority }),
- ...(categoryId && { categoryId }),
+ AND: [
+ roleWhere,
+ searchWhere,
+ ...(status ? [{ status }] : []),
+ ...(priority ? [{ priority }] : []),
+ ...(categoryId ? [{ categoryId }] : []),
+ ],
  };
 
  const [total, tickets] = await Promise.all([
@@ -181,6 +222,7 @@ export class TicketService {
  },
  },
  comments: {
+ where: currentUser.role === RoleName.EMPLOYEE ? { isInternal: false } : undefined,
  orderBy: { createdAt: 'asc' },
  include: {
  user: { select: { id: true, fullName: true, role: true, avatarUrl: true } },
@@ -202,9 +244,19 @@ export class TicketService {
  throw { statusCode: 404, message: 'Ticket not found' };
  }
 
- // Role authorization check for Employee
+ // Enforce the same visibility rules used by the ticket list.
  if (currentUser.role === RoleName.EMPLOYEE && ticket.requesterId !== currentUser.userId) {
  throw { statusCode: 403, message: 'Access denied to this ticket' };
+ }
+
+ if (currentUser.role === RoleName.TECHNICIAN) {
+ const isRequester = ticket.requesterId === currentUser.userId;
+ const latestAssignment = ticket.assignments[0];
+ const isAssignedTechnician = latestAssignment?.technician.id === currentUser.userId;
+
+ if (!isRequester && !isAssignedTechnician) {
+ throw { statusCode: 403, message: 'This ticket is not assigned to you' };
+ }
  }
 
  return ticket;

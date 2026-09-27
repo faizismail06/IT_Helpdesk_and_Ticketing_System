@@ -21,6 +21,20 @@ enum TicketPriority {
   CRITICAL
 }
 
+enum TicketImpact {
+  INDIVIDUAL
+  TEAM
+  DEPARTMENT
+  ORGANIZATION
+}
+
+enum TicketUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 enum TicketStatus {
   NEW
   OPEN
@@ -88,21 +102,25 @@ model SlaRule {
 }
 
 model Ticket {
-  id           String         @id @default(uuid())
-  ticketNumber String         @unique
-  subject      String
-  description  String
-  categoryId   String
-  category     TicketCategory @relation(fields: [categoryId], references: [id])
-  priority     TicketPriority @default(MEDIUM)
-  status       TicketStatus   @default(NEW)
-  requesterId  String
-  requester    User           @relation("TicketRequester", fields: [requesterId], references: [id])
-  slaDeadline  DateTime
-  isOverdue    Boolean        @default(false)
-  workTimeMins Int            @default(0)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id                 String         @id @default(uuid())
+  ticketNumber       String         @unique
+  subject            String
+  description        String
+  categoryId         String
+  category           TicketCategory @relation(fields: [categoryId], references: [id])
+  impact             TicketImpact   @default(INDIVIDUAL)
+  urgency            TicketUrgency  @default(MEDIUM)
+  suggestedPriority  TicketPriority @default(MEDIUM)
+  priority           TicketPriority @default(MEDIUM)
+  isPriorityReviewed Boolean        @default(false)
+  status             TicketStatus   @default(NEW)
+  requesterId        String
+  requester          User           @relation("TicketRequester", fields: [requesterId], references: [id])
+  slaDeadline        DateTime
+  isOverdue          Boolean        @default(false)
+  workTimeMins       Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   assignments TicketAssignment[]
   comments    TicketComment[]

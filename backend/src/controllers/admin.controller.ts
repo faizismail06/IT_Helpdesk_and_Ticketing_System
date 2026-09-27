@@ -66,4 +66,8 @@ export class AdminController {
  next(err);
  }
  }
+
+ static async getCategories(_req: AuthenticatedRequest, res: Response, next: NextFunction) { try { sendSuccess(res, 'Categories retrieved', await AdminService.listCategories()); } catch (err) { next(err); } }
+ static async createCategory(req: AuthenticatedRequest, res: Response, next: NextFunction) { try { sendSuccess(res, 'Category created', await AdminService.createCategory(req.user!, req.body), 201); } catch (err) { next(err); } }
+ static async updateCategory(req: AuthenticatedRequest, res: Response, next: NextFunction) { try { sendSuccess(res, 'Category updated', await AdminService.updateCategory(req.user!, String(req.params.id), req.body)); } catch (err) { next(err); } }
 }

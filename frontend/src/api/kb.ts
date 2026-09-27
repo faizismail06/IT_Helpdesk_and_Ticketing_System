@@ -8,18 +8,12 @@ export interface KnowledgeArticle {
  category: string;
  tags: string[];
  viewsCount: number;
+ isPublished: boolean;
  createdAt: string;
  author: {
  id: string;
  fullName: string;
  };
-}
-
-export interface CreateArticleParams {
- title: string;
- content: string;
- category: string;
- tags?: string[];
 }
 
 export const kbApi = {
@@ -32,9 +26,7 @@ export const kbApi = {
  const res = await api.get(`/knowledge-base/${slug}`);
  return res.data.data;
  },
-
- createArticle: async (data: CreateArticleParams): Promise<KnowledgeArticle> => {
- const res = await api.post('/knowledge-base', data);
- return res.data.data;
- },
+ createArticle: async (data: { title: string; content: string; category: string; tags: string[]; isPublished: boolean }) => (await api.post('/knowledge-base', data)).data.data,
+ updateArticle: async (id: string, data: Partial<{ title: string; content: string; category: string; tags: string[]; isPublished: boolean }>) => (await api.patch(`/knowledge-base/${id}`, data)).data.data,
+ deleteArticle: async (id: string) => (await api.delete(`/knowledge-base/${id}`)).data.data,
 };

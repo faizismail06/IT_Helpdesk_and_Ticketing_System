@@ -43,9 +43,30 @@ export const initSocketIO = (httpServer: HttpServer): SocketIOServer => {
  console.log(` Socket Connected: User ${user.userId} (${user.role}) joined rooms: ${userRoom}, ${roleRoom}`);
 
  // Detail page room joining
- socket.on('join:ticket', (ticketId: string) => {
- const ticketRoom = `ticket_${ticketId}`;
- socket.join(ticketRoom);
+ socket.on('join:ticket', async (ticketId: string, acknowledge?: (result: any) => void) => {
+ try {
+ const ticket = await prisma.ticket.findUnique({
+ where: { id: ticketId },
+ select: {
+ requesterId: true,
+ assignments: { orderBy: { assignedAt: 'desc' }, take: 1, select: { technicianId: true } },
+ },
+ });
+ const canAccess = ticket && (
+ user.role === 'ADMIN' ||
+ user.role === 'HELPDESK' ||
+ ticket.requesterId === user.userId ||
+ ticket.assignments[0]?.technicianId === user.userId
+ );
+ if (!canAccess) {
+ acknowledge?.({ ok: false, message: 'Access denied to ticket room' });
+ return;
+ }
+ socket.join(`ticket_${ticketId}`);
+ acknowledge?.({ ok: true });
+ } catch {
+ acknowledge?.({ ok: false, message: 'Unable to join ticket room' });
+ }
  });
 
  socket.on('leave:ticket', (ticketId: string) => {

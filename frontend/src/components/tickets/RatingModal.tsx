@@ -78,11 +78,11 @@ export const RatingModal: React.FC<RatingModalProps> = ({ ticketId, isOpen, onCl
  })}
  </div>
  <div className="text-xs font-mono font-bold text-amber-400">
- {score === 5 && '⭐⭐⭐⭐⭐ Excellent Support'}
- {score === 4 && '⭐⭐⭐⭐ Good Service'}
- {score === 3 && '⭐⭐⭐ Satisfactory'}
- {score === 2 && '⭐⭐ Needs Improvement'}
- {score === 1 && '⭐ Poor Experience'}
+ {score === 5 && 'Excellent Support'}
+ {score === 4 && 'Good Service'}
+ {score === 3 && 'Satisfactory'}
+ {score === 2 && 'Needs Improvement'}
+ {score === 1 && 'Poor Experience'}
  </div>
  </div>
 

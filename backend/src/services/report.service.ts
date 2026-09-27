@@ -22,7 +22,11 @@ export class ReportService {
  if (startDate || endDate) {
  where.createdAt = {};
  if (startDate) where.createdAt.gte = new Date(startDate);
- if (endDate) where.createdAt.lte = new Date(endDate);
+ if (endDate) {
+ const inclusiveEnd = new Date(endDate);
+ inclusiveEnd.setHours(23, 59, 59, 999);
+ where.createdAt.lte = inclusiveEnd;
+ }
  }
 
  const tickets = await prisma.ticket.findMany({
@@ -44,7 +48,11 @@ export class ReportService {
  ticketNumber: t.ticketNumber,
  subject: t.subject,
  category: t.category?.name || 'Uncategorized',
+ impact: t.impact,
+ urgency: t.urgency,
+ suggestedPriority: t.suggestedPriority,
  priority: t.priority,
+ priorityReviewed: t.isPriorityReviewed ? 'YES' : 'NO',
  status: t.status,
  requester: t.requester.fullName,
  department: t.requester.department?.name || 'N/A',

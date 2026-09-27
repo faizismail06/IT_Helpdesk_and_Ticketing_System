@@ -30,25 +30,55 @@ export const ReportsPage: React.FC = () => {
  }),
  });
 
- // Export to CSV function
- const handleExportCSV = () => {
+ const handleExportExcel = async () => {
  if (!reportData || reportData.length === 0) return;
 
- const headers = Object.keys(reportData[0]).join(',');
- const rows = reportData.map((row) =>
- Object.values(row)
- .map((val) => `"${String(val).replace(/"/g, '""')}"`)
- .join(',')
- );
+ const ExcelJS = await import('exceljs');
+ const workbook = new ExcelJS.Workbook();
+ workbook.creator = 'IT Helpdesk System';
+ workbook.created = new Date();
+ const worksheet = workbook.addWorksheet('Tickets', {
+ views: [{ state: 'frozen', ySplit: 1 }],
+ });
 
- const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
- const encodedUri = encodeURI(csvContent);
+ const columns = [
+ ['Ticket Number', 'ticketNumber'], ['Subject', 'subject'], ['Category', 'category'],
+ ['Impact', 'impact'], ['Urgency', 'urgency'], ['Suggested Priority', 'suggestedPriority'],
+ ['Final Priority', 'priority'], ['Priority Reviewed', 'priorityReviewed'], ['Status', 'status'],
+ ['Requester', 'requester'], ['Department', 'department'], ['Technician', 'technician'],
+ ['SLA Deadline', 'slaDeadline'], ['Overdue', 'isOverdue'], ['Work Time (Minutes)', 'workTimeMins'],
+ ['Rating', 'ratingScore'], ['Rating Feedback', 'ratingFeedback'], ['Created Date', 'createdDate'],
+ ] as const;
+
+ worksheet.addTable({
+ name: 'HelpdeskTickets',
+ ref: 'A1',
+ headerRow: true,
+ totalsRow: false,
+ style: { theme: 'TableStyleMedium2', showRowStripes: true },
+ columns: columns.map(([name]) => ({ name, filterButton: true })),
+ rows: reportData.map((row) => columns.map(([, key]) => row[key])),
+ });
+
+ const widths = [18, 42, 24, 16, 14, 20, 16, 18, 16, 24, 22, 24, 24, 12, 20, 12, 36, 24];
+ worksheet.columns.forEach((column, index) => {
+ column.width = widths[index];
+ column.alignment = { vertical: 'top', wrapText: index === 1 || index === 16 };
+ });
+ worksheet.getRow(1).height = 24;
+
+ const buffer = await workbook.xlsx.writeBuffer();
+ const blob = new Blob([new Uint8Array(buffer)], {
+ type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+ });
+ const url = URL.createObjectURL(blob);
  const link = document.createElement('a');
- link.setAttribute('href', encodedUri);
- link.setAttribute('download', `IT_Helpdesk_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+ link.href = url;
+ link.download = `IT_Helpdesk_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
  document.body.appendChild(link);
  link.click();
  document.body.removeChild(link);
+ URL.revokeObjectURL(url);
  };
 
  // Recharts Chart Aggregations
@@ -80,12 +110,12 @@ export const ReportsPage: React.FC = () => {
  </div>
  <h1 className="text-xl font-bold text-white">System Reports & Data Exporter</h1>
  <p className="text-xs text-slate-400">
- Generate operational performance metrics, SLA compliance reports, and export raw CSV/Excel datasets.
+ Generate operational performance metrics, SLA compliance reports, and structured Excel workbooks.
  </p>
  </div>
 
- <Button variant="primary" size="md" onClick={handleExportCSV} disabled={reportData.length === 0}>
- <Download className="w-4 h-4" /> Export CSV / Excel ({reportData.length})
+ <Button variant="primary" size="md" onClick={handleExportExcel} disabled={reportData.length === 0}>
+ <Download className="w-4 h-4" /> Export Excel ({reportData.length})
  </Button>
  </div>
 

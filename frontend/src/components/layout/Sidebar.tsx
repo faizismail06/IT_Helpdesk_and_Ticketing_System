@@ -26,23 +26,24 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
  // Dashboard Items
  { title: 'Employee Portal', path: '/employee', icon: LayoutDashboard, roles: ['EMPLOYEE'] },
- { title: 'Helpdesk Queue', path: '/helpdesk', icon: Headset, badge: '5 New', roles: ['HELPDESK'] },
- { title: 'Tech Workstation', path: '/technician', icon: Wrench, badge: '3 Active', roles: ['TECHNICIAN'] },
+ { title: 'Helpdesk Queue', path: '/helpdesk', icon: Headset, roles: ['HELPDESK'] },
+ { title: 'Tech Workstation', path: '/technician', icon: Wrench, roles: ['TECHNICIAN'] },
  { title: 'Admin Console', path: '/admin', icon: Shield, roles: ['ADMIN'] },
 
  // Ticket Operations
  { title: 'My Tickets', path: '/tickets', icon: Ticket, roles: ['EMPLOYEE'] },
  { title: 'All Tickets Queue', path: '/tickets', icon: Ticket, roles: ['HELPDESK', 'ADMIN'] },
  { title: 'Assigned Tickets', path: '/tickets', icon: Clock, roles: ['TECHNICIAN'] },
- { title: 'Submit New Ticket', path: '/tickets/new', icon: PlusCircle, roles: ['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN'] },
+ { title: 'Submit New Ticket', path: '/tickets/new', icon: PlusCircle, roles: ['EMPLOYEE'] },
 
  // Knowledge & Analytics
- { title: 'Knowledge Base', path: '/knowledge-base', icon: BookOpen, roles: ['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN'] },
+ { title: 'Knowledge Base', path: '/knowledge-base', icon: BookOpen, roles: ['EMPLOYEE'] },
  { title: 'Reports & Export', path: '/reports', icon: BarChart3, roles: ['HELPDESK', 'ADMIN'] },
 
  // Admin Specific
  { title: 'User Management', path: '/admin/users', icon: Users, roles: ['ADMIN'] },
  { title: 'SLA Configurator', path: '/admin/sla', icon: Clock, roles: ['ADMIN'] },
+ { title: 'Categories & Knowledge', path: '/admin/content', icon: BookOpen, roles: ['ADMIN'] },
  { title: 'Audit Trail Logs', path: '/admin/audit', icon: Shield, roles: ['ADMIN'] },
 ];
 

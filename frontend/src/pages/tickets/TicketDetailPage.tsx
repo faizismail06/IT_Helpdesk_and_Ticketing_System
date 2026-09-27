@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ticketApi } from '../../api/tickets';
 import { TicketStatusBadge } from '../../components/tickets/TicketStatusBadge';
 import { TicketPriorityBadge } from '../../components/tickets/TicketPriorityBadge';
 import { SlaCountdownMeter } from '../../components/tickets/SlaCountdownMeter';
 import { TriageAssignModal } from '../../components/tickets/TriageAssignModal';
 import { StatusTransitionModal } from '../../components/tickets/StatusTransitionModal';
+import { RatingModal } from '../../components/tickets/RatingModal';
 import { ConversationThread } from '../../components/tickets/ConversationThread';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSocket } from '../../contexts/SocketContext';
 import { TicketStatus } from '../../types/ticket';
 import {
  ArrowLeft,
@@ -24,21 +26,43 @@ import {
  Wrench,
  CheckCircle2,
  RotateCcw,
+ Star,
+ Paperclip,
+ Download,
+ Pencil,
+ XCircle,
 } from 'lucide-react';
 
 export const TicketDetailPage: React.FC = () => {
  const { id } = useParams<{ id: string }>();
  const navigate = useNavigate();
  const { user: currentUser } = useAuth();
+ const { socket } = useSocket();
+ const queryClient = useQueryClient();
 
  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
  const [transitionTargetStatus, setTransitionTargetStatus] = useState<TicketStatus | null>(null);
+ const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+ const [isEditOpen, setIsEditOpen] = useState(false);
+ const [editSubject, setEditSubject] = useState('');
+ const [editDescription, setEditDescription] = useState('');
 
  const { data: ticket, isLoading, isError, error } = useQuery({
  queryKey: ['ticket', id],
  queryFn: () => ticketApi.getTicketById(id!),
  enabled: Boolean(id),
  });
+
+ useEffect(() => {
+ if (!socket || !id) return;
+ socket.emit('join:ticket', id);
+ return () => { socket.emit('leave:ticket', id); };
+ }, [socket, id]);
+
+ const refreshTicket = () => { queryClient.invalidateQueries({ queryKey: ['ticket', id] }); queryClient.invalidateQueries({ queryKey: ['tickets'] }); queryClient.invalidateQueries({ queryKey: ['dashboard'] }); };
+ const cancelMutation = useMutation({ mutationFn: () => ticketApi.cancelTicket(id!), onSuccess: refreshTicket });
+ const editMutation = useMutation({ mutationFn: () => ticketApi.updateTicket(id!, { subject: editSubject, description: editDescription }), onSuccess: () => { setIsEditOpen(false); refreshTicket(); } });
+ const uploadMutation = useMutation({ mutationFn: (file: File) => ticketApi.uploadAttachment(id!, file), onSuccess: refreshTicket });
 
  if (isLoading) {
  return (
@@ -71,7 +95,7 @@ export const TicketDetailPage: React.FC = () => {
 
  const isHelpdeskOrAdmin = ['HELPDESK', 'ADMIN'].includes(currentUser?.role || '');
  const isTechnician = currentUser?.role === 'TECHNICIAN';
- const isRequester = currentUser?.id === ticket.requesterId;
+ const isRequester = currentUser?.role === 'EMPLOYEE' && currentUser.id === ticket.requesterId;
 
  return (
  <div className="space-y-6 animate-in fade-in duration-200">
@@ -91,6 +115,7 @@ export const TicketDetailPage: React.FC = () => {
 
  {/* Quick Workflow Action Buttons */}
  <div className="flex flex-wrap items-center gap-2">
+ {isRequester && ticket.status === 'NEW' && <><Button variant="secondary" size="sm" onClick={() => { setEditSubject(ticket.subject); setEditDescription(ticket.description); setIsEditOpen(true); }}><Pencil className="w-3.5 h-3.5" />Edit</Button><Button variant="danger" size="sm" isLoading={cancelMutation.isPending} onClick={() => { if (confirm('Cancel this ticket?')) cancelMutation.mutate(); }}><XCircle className="w-3.5 h-3.5" />Cancel</Button></>}
  {/* Helpdesk Assignment Trigger */}
  {isHelpdeskOrAdmin && !['RESOLVED', 'CLOSED'].includes(ticket.status) && (
  <Button variant="primary" size="sm" onClick={() => setIsAssignModalOpen(true)}>
@@ -100,10 +125,17 @@ export const TicketDetailPage: React.FC = () => {
  )}
 
  {/* Technician Action Buttons */}
- {(isTechnician || isHelpdeskOrAdmin) && ticket.status === 'OPEN' && (
+ {(isTechnician || isHelpdeskOrAdmin) && ['OPEN', 'REOPENED'].includes(ticket.status) && (
  <Button variant="primary" size="sm" onClick={() => setTransitionTargetStatus('IN_PROGRESS')}>
  Start Work (In Progress)
  </Button>
+ )}
+
+ {(isTechnician || isHelpdeskOrAdmin) && ticket.status === 'PENDING' && (
+ <>
+ <Button variant="secondary" size="sm" onClick={() => setTransitionTargetStatus('IN_PROGRESS')}>Resume Work</Button>
+ <Button variant="primary" size="sm" onClick={() => setTransitionTargetStatus('RESOLVED')}><CheckCircle2 className="w-3.5 h-3.5" />Submit Resolution</Button>
+ </>
  )}
 
  {(isTechnician || isHelpdeskOrAdmin) && ticket.status === 'IN_PROGRESS' && (
@@ -115,6 +147,10 @@ export const TicketDetailPage: React.FC = () => {
  <CheckCircle2 className="w-3.5 h-3.5" /> Submit Resolution
  </Button>
  </>
+ )}
+
+ {isRequester && ['RESOLVED', 'CLOSED'].includes(ticket.status) && !ticket.rating && (
+ <Button variant="secondary" size="sm" onClick={() => setIsRatingModalOpen(true)}>Rate Support</Button>
  )}
 
  {/* Requester Confirm Resolution or Reopen */}
@@ -153,6 +189,11 @@ export const TicketDetailPage: React.FC = () => {
  {ticket.description}
  </p>
  </div>
+ </Card>
+
+ <Card className="space-y-3">
+ <div className="flex items-center justify-between"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Paperclip className="w-4 h-4 text-blue-400" />Attachments</h2><label className="cursor-pointer text-xs text-blue-400 hover:text-blue-300"><span>Add file</span><input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx" onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadMutation.mutate(file); event.target.value = ''; }} /></label></div>
+ <div className="space-y-2">{ticket.attachments?.map((file) => <button key={file.id} onClick={() => ticketApi.downloadAttachment(file.id, file.originalFilename)} className="w-full flex items-center justify-between p-3 bg-[#090d16] border border-slate-800 rounded-lg text-xs text-slate-300 hover:border-blue-500/40"><span className="truncate">{file.originalFilename} ({Math.ceil(file.fileSize / 1024)} KB)</span><Download className="w-4 h-4 text-blue-400 shrink-0" /></button>)}{!ticket.attachments?.length && <p className="text-xs text-slate-500">No attachments.</p>}</div>
  </Card>
 
  {/* Activity & Conversation Thread */}
@@ -196,6 +237,14 @@ export const TicketDetailPage: React.FC = () => {
 
  {/* Right Column: Metadata Panel */}
  <div className="space-y-4">
+ <Card className="space-y-2 text-xs">
+ <h3 className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Triage Assessment</h3>
+ <div className="flex justify-between text-slate-400"><span>Impact</span><span className="font-mono text-slate-200">{ticket.impact.replace('_', ' ')}</span></div>
+ <div className="flex justify-between text-slate-400"><span>Urgency</span><span className="font-mono text-slate-200">{ticket.urgency}</span></div>
+ <div className="flex justify-between text-slate-400"><span>Suggested</span><span className="font-mono text-blue-400">{ticket.suggestedPriority}</span></div>
+ <div className="flex justify-between text-slate-400"><span>Final priority</span><span className="font-mono text-slate-200">{ticket.priority}{ticket.isPriorityReviewed ? ' (reviewed)' : ' (awaiting triage)'}</span></div>
+ </Card>
+
  {/* SLA Dynamic Countdown Meter */}
  <SlaCountdownMeter
  createdAt={ticket.createdAt}
@@ -237,6 +286,29 @@ export const TicketDetailPage: React.FC = () => {
  )}
  </Card>
 
+ {ticket.rating && (
+ <Card className="space-y-3 text-xs">
+ <h3 className="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+ <Star className="w-4 h-4 text-amber-400" />
+ Requester Satisfaction
+ </h3>
+ <div className="flex items-center gap-1" aria-label={`${ticket.rating.score} out of 5 stars`}>
+ {[1, 2, 3, 4, 5].map((score) => (
+ <Star
+ key={score}
+ className={`w-4 h-4 ${score <= ticket.rating!.score ? 'text-amber-400 fill-amber-400' : 'text-slate-700'}`}
+ />
+ ))}
+ <span className="ml-2 font-mono font-semibold text-slate-200">{ticket.rating.score}/5</span>
+ </div>
+ {ticket.rating.feedback && (
+ <p className="p-3 rounded-lg bg-[#090d16] border border-slate-800 text-slate-300 leading-relaxed whitespace-pre-wrap">
+ {ticket.rating.feedback}
+ </p>
+ )}
+ </Card>
+ )}
+
  {/* Work Effort & System Dates */}
  <Card className="space-y-2 text-xs text-slate-400 font-mono text-[11px]">
  <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
@@ -260,6 +332,8 @@ export const TicketDetailPage: React.FC = () => {
  ticketId={ticket.id}
  isOpen={isAssignModalOpen}
  onClose={() => setIsAssignModalOpen(false)}
+ suggestedPriority={ticket.suggestedPriority}
+ currentPriority={ticket.priority}
  />
 
  {transitionTargetStatus && (
@@ -270,6 +344,8 @@ export const TicketDetailPage: React.FC = () => {
  onClose={() => setTransitionTargetStatus(null)}
  />
  )}
+ <RatingModal ticketId={ticket.id} isOpen={isRatingModalOpen} onClose={() => setIsRatingModalOpen(false)} />
+ {isEditOpen && <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"><div className="w-full max-w-xl bg-[#111726] border border-slate-800 rounded-lg p-5 space-y-4"><h2 className="text-sm font-bold text-white">Edit New Ticket</h2><input className="w-full bg-[#090d16] border border-slate-800 rounded-lg p-3 text-sm text-white" value={editSubject} onChange={(e) => setEditSubject(e.target.value)} /><textarea className="w-full min-h-36 bg-[#090d16] border border-slate-800 rounded-lg p-3 text-sm text-white" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} /><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsEditOpen(false)}>Close</Button><Button isLoading={editMutation.isPending} onClick={() => editMutation.mutate()}>Save Changes</Button></div></div></div>}
  </div>
  );
 };

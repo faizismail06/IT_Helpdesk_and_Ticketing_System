@@ -19,6 +19,10 @@ export interface UpdateUserInput {
 }
 
 export class AdminService {
+ private static generateTemporaryPassword() {
+ const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+ return Array.from({ length: 14 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+ }
  static async createUser(adminUser: JwtPayload, input: CreateUserInput) {
  const existing = await prisma.user.findUnique({ where: { email: input.email } });
  if (existing) {
@@ -81,7 +85,7 @@ export class AdminService {
  return user;
  }
 
- static async resetUserPassword(adminUser: JwtPayload, targetUserId: string, newPassword = 'Password123!') {
+ static async resetUserPassword(adminUser: JwtPayload, targetUserId: string, newPassword = AdminService.generateTemporaryPassword()) {
  const passwordHash = await hashPassword(newPassword);
  const user = await prisma.user.update({
  where: { id: targetUserId },
@@ -96,6 +100,22 @@ export class AdminService {
  );
 
  return { email: user.email, defaultPassword: newPassword };
+ }
+
+ static async listCategories(includeInactive = true) {
+ return prisma.ticketCategory.findMany({ where: includeInactive ? undefined : { isActive: true }, orderBy: { name: 'asc' }, include: { _count: { select: { tickets: true } } } });
+ }
+
+ static async createCategory(admin: JwtPayload, input: { name: string; description?: string }) {
+ const category = await prisma.ticketCategory.create({ data: input });
+ await AuditLogService.logAction(admin.userId, 'Ticket category created', 'CATEGORY', category.id, { name: category.name });
+ return category;
+ }
+
+ static async updateCategory(admin: JwtPayload, id: string, input: { name?: string; description?: string; isActive?: boolean }) {
+ const category = await prisma.ticketCategory.update({ where: { id }, data: input });
+ await AuditLogService.logAction(admin.userId, 'Ticket category updated', 'CATEGORY', id, input);
+ return category;
  }
 
  static async getSlaRules() {

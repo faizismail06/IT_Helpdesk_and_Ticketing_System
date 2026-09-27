@@ -33,6 +33,7 @@ export const StatusTransitionModal: React.FC<StatusTransitionModalProps> = ({
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
  queryClient.invalidateQueries({ queryKey: ['tickets'] });
+ queryClient.invalidateQueries({ queryKey: ['dashboard'] });
  onClose();
  },
  onError: (err: any) => {

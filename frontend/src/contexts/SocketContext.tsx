@@ -48,11 +48,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
  // Realtime Events
  newSocket.on('notification:new', () => {
  queryClient.invalidateQueries({ queryKey: ['notifications'] });
+ queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+ });
+
+ newSocket.on('ticket:created', () => {
+ queryClient.invalidateQueries({ queryKey: ['tickets'] });
+ queryClient.invalidateQueries({ queryKey: ['dashboard'] });
  });
 
  newSocket.on('ticket:status_changed', () => {
  queryClient.invalidateQueries({ queryKey: ['tickets'] });
  queryClient.invalidateQueries({ queryKey: ['ticket'] });
+ queryClient.invalidateQueries({ queryKey: ['dashboard'] });
  });
 
  newSocket.on('ticket:comment_added', () => {

@@ -3,9 +3,10 @@ import { TicketStatus, RoleName } from '@prisma/client';
 import { JwtPayload } from '../types';
 import { StatusTransitionInput, AssignTicketInput, AddCommentInput } from '../validators/workflow.validator';
 import { createAndEmitNotification, emitToRoom } from '../socket';
+import { AuditLogService } from './auditLog.service';
 
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
- NEW: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS],
+ NEW: [TicketStatus.OPEN],
  OPEN: [TicketStatus.IN_PROGRESS, TicketStatus.PENDING],
  IN_PROGRESS: [TicketStatus.PENDING, TicketStatus.RESOLVED],
  PENDING: [TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED],
@@ -16,12 +17,43 @@ const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
 };
 
 export class WorkflowService {
+ private static async getTicketForAction(ticketId: string, actor: JwtPayload) {
+ const ticket = await prisma.ticket.findUnique({
+ where: { id: ticketId },
+ include: {
+ assignments: {
+ orderBy: { assignedAt: 'desc' },
+ take: 1,
+ select: { technicianId: true },
+ },
+ },
+ });
+
+ if (!ticket) {
+ throw { statusCode: 404, message: 'Ticket not found' };
+ }
+
+ if (actor.role === RoleName.EMPLOYEE && ticket.requesterId !== actor.userId) {
+ throw { statusCode: 403, message: 'Access denied to this ticket' };
+ }
+
+ if (actor.role === RoleName.TECHNICIAN) {
+ const isRequester = ticket.requesterId === actor.userId;
+ const isAssignedTechnician = ticket.assignments[0]?.technicianId === actor.userId;
+ if (!isRequester && !isAssignedTechnician) {
+ throw { statusCode: 403, message: 'This ticket is not assigned to you' };
+ }
+ }
+
+ return ticket;
+ }
+
  static validateStatusTransition(
  currentStatus: TicketStatus,
  targetStatus: TicketStatus,
  role: RoleName
  ): boolean {
- if (currentStatus === targetStatus) return true;
+ if (currentStatus === targetStatus) return false;
 
  const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
  if (!allowed.includes(targetStatus)) {
@@ -37,19 +69,25 @@ export class WorkflowService {
  if (currentStatus === TicketStatus.CLOSED) {
  return (targetStatus as TicketStatus) === TicketStatus.REOPENED;
  }
+ return false;
+ }
+
+ if (role === RoleName.TECHNICIAN) {
+ const technicianTransitions: Partial<Record<TicketStatus, TicketStatus[]>> = {
+ OPEN: [TicketStatus.IN_PROGRESS],
+ IN_PROGRESS: [TicketStatus.PENDING, TicketStatus.RESOLVED],
+ PENDING: [TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED],
+ REOPENED: [TicketStatus.IN_PROGRESS],
+ OVERDUE: [TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED],
+ };
+ return technicianTransitions[currentStatus]?.includes(targetStatus) ?? false;
  }
 
  return true;
  }
 
  static async changeStatus(ticketId: string, actor: JwtPayload, input: StatusTransitionInput) {
- const ticket = await prisma.ticket.findUnique({
- where: { id: ticketId },
- });
-
- if (!ticket) {
- throw { statusCode: 404, message: 'Ticket not found' };
- }
+ const ticket = await this.getTicketForAction(ticketId, actor);
 
  const isValid = this.validateStatusTransition(ticket.status, input.status, actor.role);
  if (!isValid) {
@@ -59,7 +97,7 @@ export class WorkflowService {
  };
  }
 
- return prisma.$transaction(async (tx) => {
+ const result = await prisma.$transaction(async (tx) => {
  const updatedTicket = await tx.ticket.update({
  where: { id: ticketId },
  data: {
@@ -111,6 +149,8 @@ export class WorkflowService {
 
  return updatedTicket;
  });
+ await AuditLogService.logAction(actor.userId, 'Ticket status changed', 'TICKET', ticketId, { from: ticket.status, to: input.status });
+ return result;
  }
 
  static async assignTechnician(ticketId: string, helpdeskUser: JwtPayload, input: AssignTicketInput) {
@@ -120,11 +160,22 @@ export class WorkflowService {
  }
 
  const tech = await prisma.user.findUnique({ where: { id: input.technicianId } });
- if (!tech || (tech.role !== RoleName.TECHNICIAN && tech.role !== RoleName.ADMIN)) {
- throw { statusCode: 400, message: 'Assigned user must have Technician or Admin role' };
+ if (!tech || tech.role !== RoleName.TECHNICIAN || !tech.isActive) {
+ throw { statusCode: 400, message: 'Assigned user must be an active technician' };
  }
 
- return prisma.$transaction(async (tx) => {
+ if (ticket.status === TicketStatus.RESOLVED || ticket.status === TicketStatus.CLOSED) {
+ throw { statusCode: 400, message: 'Resolved or closed tickets cannot be assigned' };
+ }
+
+ const result = await prisma.$transaction(async (tx) => {
+ const slaRule = await tx.slaRule.findUnique({ where: { priority: input.priority } });
+ const resolutionHours = slaRule?.resolutionHours ?? 24;
+ const slaDeadline = new Date(ticket.createdAt.getTime() + resolutionHours * 60 * 60 * 1000);
+
+ // Keep one active assignment. Reassignment history remains in TicketHistory.
+ await tx.ticketAssignment.deleteMany({ where: { ticketId } });
+
  // 1. Create assignment record
  const assignment = await tx.ticketAssignment.create({
  data: {
@@ -137,15 +188,21 @@ export class WorkflowService {
  },
  });
 
- // 2. Update status to IN_PROGRESS if NEW or OPEN
+ // 2. Assignment completes triage. The technician starts work separately.
  let newStatus = ticket.status;
- if (ticket.status === TicketStatus.NEW || ticket.status === TicketStatus.OPEN) {
- newStatus = TicketStatus.IN_PROGRESS;
+ if (ticket.status === TicketStatus.NEW) {
+ newStatus = TicketStatus.OPEN;
  }
 
  await tx.ticket.update({
  where: { id: ticketId },
- data: { status: newStatus },
+ data: {
+ status: newStatus,
+ priority: input.priority,
+ isPriorityReviewed: true,
+ slaDeadline,
+ isOverdue: slaDeadline.getTime() < Date.now(),
+ },
  });
 
  // 3. History record
@@ -155,7 +212,7 @@ export class WorkflowService {
  actorId: helpdeskUser.userId,
  action: 'ASSIGNED',
  oldValue: ticket.status,
- newValue: `Assigned to ${tech.fullName} (Status: ${newStatus})`,
+ newValue: `Assigned to ${tech.fullName}; priority confirmed as ${input.priority} (Status: ${newStatus})`,
  },
  });
 
@@ -169,13 +226,12 @@ export class WorkflowService {
 
  return assignment;
  });
+ await AuditLogService.logAction(helpdeskUser.userId, 'Ticket assigned', 'TICKET', ticketId, { technicianId: input.technicianId, priority: input.priority });
+ return result;
  }
 
  static async addComment(ticketId: string, actor: JwtPayload, input: AddCommentInput) {
- const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
- if (!ticket) {
- throw { statusCode: 404, message: 'Ticket not found' };
- }
+ const ticket = await this.getTicketForAction(ticketId, actor);
 
  // Employee cannot post internal IT notes
  let isInternal = input.isInternal;
@@ -209,6 +265,8 @@ export class WorkflowService {
  ticketId
  );
  }
+
+ await AuditLogService.logAction(actor.userId, isInternal ? 'Internal note added' : 'Ticket comment added', 'TICKET', ticketId, { commentId: comment.id });
 
  return comment;
  }

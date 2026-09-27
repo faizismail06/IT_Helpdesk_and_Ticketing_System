@@ -9,9 +9,11 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { TicketPriority, TicketStatus } from '../../types/ticket';
 import { Search, PlusCircle, Filter, ChevronLeft, ChevronRight, Loader2, Clock, RefreshCw } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const TicketListPage: React.FC = () => {
  const navigate = useNavigate();
+ const { user } = useAuth();
  const [searchQuery, setSearchQuery] = useState('');
  const [selectedStatus, setSelectedStatus] = useState<TicketStatus | ''>('');
  const [selectedPriority, setSelectedPriority] = useState<TicketPriority | ''>('');
@@ -53,10 +55,10 @@ export const TicketListPage: React.FC = () => {
  <RefreshCw className="w-3.5 h-3.5" />
  Refresh
  </Button>
- <Button variant="primary" size="sm" onClick={() => navigate('/tickets/new')}>
+ {user?.role === 'EMPLOYEE' && <Button variant="primary" size="sm" onClick={() => navigate('/tickets/new')}>
  <PlusCircle className="w-4 h-4" />
  Submit New Ticket
- </Button>
+ </Button>}
  </div>
  </div>
 

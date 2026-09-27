@@ -8,17 +8,8 @@ export class KbController {
  try {
  const q = req.query.q as string | undefined;
  const category = req.query.category as string | undefined;
- const articles = await KbService.listArticles(q, category);
+ const articles = await KbService.listArticles(q, category, req.user?.role === 'ADMIN');
  sendSuccess(res, 'Knowledge Base articles retrieved', articles);
- } catch (err) {
- next(err);
- }
- }
-
- static async createArticle(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
- try {
- const article = await KbService.createArticle(req.user!, req.body);
- sendSuccess(res, 'Article created successfully', article, 201);
  } catch (err) {
  next(err);
  }
@@ -33,4 +24,8 @@ export class KbController {
  next(err);
  }
  }
+
+ static async createArticle(req: AuthenticatedRequest, res: Response, next: NextFunction) { try { sendSuccess(res, 'Article created', await KbService.createArticle(req.user!, req.body), 201); } catch (err) { next(err); } }
+ static async updateArticle(req: AuthenticatedRequest, res: Response, next: NextFunction) { try { sendSuccess(res, 'Article updated', await KbService.updateArticle(req.user!, String(req.params.id), req.body)); } catch (err) { next(err); } }
+ static async deleteArticle(req: AuthenticatedRequest, res: Response, next: NextFunction) { try { await KbService.deleteArticle(req.user!, String(req.params.id)); sendSuccess(res, 'Article deleted'); } catch (err) { next(err); } }
 }

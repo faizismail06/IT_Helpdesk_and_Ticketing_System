@@ -1,5 +1,5 @@
 import { api } from './axios';
-import { Ticket, TicketAssignment, TicketComment, TicketStatus } from '../types/ticket';
+import { Ticket, TicketAssignment, TicketComment, TicketPriority, TicketStatus } from '../types/ticket';
 
 export interface ChangeStatusParams {
  status: TicketStatus;
@@ -9,6 +9,7 @@ export interface ChangeStatusParams {
 
 export interface AssignTechnicianParams {
  technicianId: string;
+ priority: TicketPriority;
 }
 
 export interface AddCommentParams {

@@ -5,16 +5,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ticketApi } from '../../api/tickets';
+import { kbApi } from '../../api/kb';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
-import { PlusCircle, ArrowLeft, BookOpen, AlertCircle, Sparkles } from 'lucide-react';
+import { PlusCircle, ArrowLeft, BookOpen, AlertCircle, Search } from 'lucide-react';
 
 const ticketFormSchema = z.object({
  subject: z.string().min(5, 'Subject must be at least 5 characters long').max(200),
  description: z.string().min(10, 'Detailed description must be at least 10 characters long'),
  categoryId: z.string().min(1, 'Please select an IT category'),
- priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+ impact: z.enum(['INDIVIDUAL', 'TEAM', 'DEPARTMENT', 'ORGANIZATION']),
+ urgency: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
 });
 
 type TicketFormValues = z.infer<typeof ticketFormSchema>;
@@ -40,16 +42,33 @@ export const CreateTicketPage: React.FC = () => {
  subject: '',
  description: '',
  categoryId: '',
- priority: 'MEDIUM',
+ impact: 'INDIVIDUAL',
+ urgency: 'MEDIUM',
  },
  });
 
  const subjectWatch = watch('subject');
+ const impactWatch = watch('impact');
+ const urgencyWatch = watch('urgency');
+
+ const priorityMatrix = {
+ INDIVIDUAL: { LOW: 'LOW', MEDIUM: 'LOW', HIGH: 'MEDIUM', CRITICAL: 'HIGH' },
+ TEAM: { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH', CRITICAL: 'HIGH' },
+ DEPARTMENT: { LOW: 'MEDIUM', MEDIUM: 'HIGH', HIGH: 'HIGH', CRITICAL: 'CRITICAL' },
+ ORGANIZATION: { LOW: 'HIGH', MEDIUM: 'HIGH', HIGH: 'CRITICAL', CRITICAL: 'CRITICAL' },
+ } as const;
+ const suggestedPriority = priorityMatrix[impactWatch][urgencyWatch];
+ const { data: suggestedArticles = [], isFetching: isSearchingKb } = useQuery({
+ queryKey: ['kb-suggestions', subjectWatch],
+ queryFn: () => kbApi.getArticles(subjectWatch),
+ enabled: subjectWatch.trim().length >= 4,
+ });
 
  const createMutation = useMutation({
  mutationFn: ticketApi.createTicket,
  onSuccess: (newTicket) => {
  queryClient.invalidateQueries({ queryKey: ['tickets'] });
+ queryClient.invalidateQueries({ queryKey: ['dashboard'] });
  navigate(`/tickets/${newTicket.id}`);
  },
  onError: (err: any) => {
@@ -124,32 +143,30 @@ export const CreateTicketPage: React.FC = () => {
  )}
  </div>
 
- {/* Priority Selector */}
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
- <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
- Priority Level *
- </label>
- <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
- {[
- { id: 'LOW', label: 'LOW (72h SLA)', color: 'border-emerald-500/30 text-emerald-400' },
- { id: 'MEDIUM', label: 'MEDIUM (24h SLA)', color: 'border-amber-500/30 text-amber-400' },
- { id: 'HIGH', label: 'HIGH (8h SLA)', color: 'border-orange-500/30 text-orange-400' },
- { id: 'CRITICAL', label: 'CRITICAL (4h SLA)', color: 'border-rose-500/30 text-rose-400' },
- ].map((p) => (
- <label
- key={p.id}
- className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-800 bg-[#1a2236]/40 hover:bg-[#1a2236] cursor-pointer text-xs font-medium text-slate-300"
- >
- <input
- type="radio"
- value={p.id}
- {...register('priority')}
- className="text-blue-600 focus:ring-blue-500 bg-slate-900 border-slate-700"
- />
- <span className={p.color}>{p.label}</span>
- </label>
- ))}
+ <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Impact Scope *</label>
+ <select {...register('impact')} className="w-full bg-[#111726] border border-slate-800 text-slate-100 text-sm rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+ <option value="INDIVIDUAL">Only me</option>
+ <option value="TEAM">Several people / one team</option>
+ <option value="DEPARTMENT">An entire department</option>
+ <option value="ORGANIZATION">The whole organization</option>
+ </select>
  </div>
+ <div>
+ <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Operational Urgency *</label>
+ <select {...register('urgency')} className="w-full bg-[#111726] border border-slate-800 text-slate-100 text-sm rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+ <option value="LOW">Work can continue normally</option>
+ <option value="MEDIUM">Work is disrupted; workaround exists</option>
+ <option value="HIGH">Core work is blocked</option>
+ <option value="CRITICAL">Critical service or security incident</option>
+ </select>
+ </div>
+ </div>
+
+ <div className="flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-[#090d16] text-xs">
+ <div><div className="font-semibold text-slate-200">System priority recommendation</div><div className="text-slate-500">Helpdesk will review this during triage.</div></div>
+ <span className="font-mono font-bold text-blue-400">{suggestedPriority}</span>
  </div>
 
  {/* Detailed Description */}
@@ -184,29 +201,20 @@ export const CreateTicketPage: React.FC = () => {
  <div className="space-y-4">
  <Card className="border-blue-500/20 bg-blue-500/5 space-y-3">
  <div className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-wider">
- <Sparkles className="w-4 h-4 text-amber-400" />
- <span>Smart KB Deflection</span>
+ <Search className="w-4 h-4" />
+ <span>Knowledge Base Suggestions</span>
  </div>
  <p className="text-xs text-slate-400 leading-relaxed">
  As you type your subject, relevant Knowledge Base troubleshooting articles will automatically be suggested here to help resolve your issue instantly.
  </p>
 
- {subjectWatch && subjectWatch.length > 3 && (
- <div className="p-3 rounded-lg bg-[#111726] border border-slate-800 space-y-2 text-xs">
- <div className="flex items-center gap-1.5 text-slate-200 font-semibold">
- <BookOpen className="w-3.5 h-3.5 text-blue-400" />
- Suggested Article:
- </div>
- <p className="text-slate-300 font-medium hover:underline cursor-pointer">
- How to reset company Outlook password & clear cached credentials
- </p>
- </div>
- )}
+ {subjectWatch.trim().length >= 4 && <div className="space-y-2 text-xs">{isSearchingKb && <p className="text-slate-500">Searching articles...</p>}{suggestedArticles.slice(0, 3).map((article) => <button type="button" key={article.id} onClick={() => navigate('/knowledge-base')} className="w-full text-left p-3 rounded-lg bg-[#111726] border border-slate-800 hover:border-blue-500/40"><span className="flex items-center gap-1.5 text-slate-200 font-semibold"><BookOpen className="w-3.5 h-3.5 text-blue-400" />{article.title}</span><span className="block text-[10px] text-slate-500 mt-1">{article.category}</span></button>)}{!isSearchingKb && suggestedArticles.length === 0 && <p className="text-slate-500">No matching article found.</p>}</div>}
  </Card>
 
  <Card className="space-y-2 text-xs">
- <h3 className="font-semibold text-slate-200">SLA Resolution Times</h3>
+ <h3 className="font-semibold text-slate-200">Priority and SLA</h3>
  <ul className="space-y-1 text-slate-400 font-mono text-[11px]">
+ <li>Final priority is confirmed by Helpdesk during triage.</li>
  <li>• Critical: 4 Hours Response/Fix</li>
  <li>• High: 8 Hours Fix</li>
  <li>• Medium: 24 Hours Fix</li>

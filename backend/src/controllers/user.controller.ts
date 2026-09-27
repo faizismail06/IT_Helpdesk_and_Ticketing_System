@@ -30,7 +30,7 @@ export class UserController {
  try {
  const id = String(req.params.id);
  const { isActive } = req.body;
- const updatedUser = await UserService.updateUserStatus(id, Boolean(isActive));
+ const updatedUser = await UserService.updateUserStatus(id, Boolean(isActive), req.user!.userId);
  sendSuccess(res, `User status updated to ${isActive ? 'active' : 'inactive'}`, updatedUser);
  } catch (err) {
  next(err);

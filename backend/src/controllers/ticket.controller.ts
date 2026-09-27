@@ -22,6 +22,14 @@ export class TicketController {
  }
  }
 
+ static async updateTicket(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+ try { sendSuccess(res, 'Ticket updated successfully', await TicketService.updateTicket(String(req.params.id), req.user!, req.body)); } catch (err) { next(err); }
+ }
+
+ static async cancelTicket(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+ try { sendSuccess(res, 'Ticket cancelled successfully', await TicketService.cancelTicket(String(req.params.id), req.user!)); } catch (err) { next(err); }
+ }
+
  static async getTicketById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
  try {
  const ticket = await TicketService.getTicketById(String(req.params.id), req.user!);

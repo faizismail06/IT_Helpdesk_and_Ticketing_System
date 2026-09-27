@@ -14,7 +14,7 @@ export const AdminUsersPage: React.FC = () => {
  // Form state
  const [email, setEmail] = useState('');
  const [fullName, setFullName] = useState('');
- const [password, setPassword] = useState('Password123!');
+ const [password, setPassword] = useState('');
  const [role, setRole] = useState('EMPLOYEE');
  const [departmentId, setDepartmentId] = useState('');
  const [errorMsg, setErrorMsg] = useState<string | null>(null);

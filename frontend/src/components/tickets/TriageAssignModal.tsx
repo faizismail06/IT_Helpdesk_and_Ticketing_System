@@ -3,16 +3,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workflowApi } from '../../api/workflow';
 import { Button } from '../ui/Button';
 import { Wrench, X, User, CheckCircle2, AlertCircle } from 'lucide-react';
+import { TicketPriority } from '../../types/ticket';
 
 interface TriageAssignModalProps {
  ticketId: string;
  isOpen: boolean;
  onClose: () => void;
+ suggestedPriority: TicketPriority;
+ currentPriority: TicketPriority;
 }
 
-export const TriageAssignModal: React.FC<TriageAssignModalProps> = ({ ticketId, isOpen, onClose }) => {
+export const TriageAssignModal: React.FC<TriageAssignModalProps> = ({ ticketId, isOpen, onClose, suggestedPriority, currentPriority }) => {
  const queryClient = useQueryClient();
  const [selectedTechId, setSelectedTechId] = useState('');
+ const [finalPriority, setFinalPriority] = useState<TicketPriority>(currentPriority || suggestedPriority);
  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
  const { data: technicians = [], isLoading } = useQuery({
@@ -22,10 +26,11 @@ export const TriageAssignModal: React.FC<TriageAssignModalProps> = ({ ticketId, 
  });
 
  const assignMutation = useMutation({
- mutationFn: (techId: string) => workflowApi.assignTechnician(ticketId, { technicianId: techId }),
+ mutationFn: () => workflowApi.assignTechnician(ticketId, { technicianId: selectedTechId, priority: finalPriority }),
  onSuccess: () => {
  queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
  queryClient.invalidateQueries({ queryKey: ['tickets'] });
+ queryClient.invalidateQueries({ queryKey: ['dashboard'] });
  onClose();
  },
  onError: (err: any) => {
@@ -47,8 +52,8 @@ export const TriageAssignModal: React.FC<TriageAssignModalProps> = ({ ticketId, 
  <Wrench className="w-5 h-5" />
  </div>
  <div>
- <h2 className="text-base font-bold text-white">Assign IT Technician</h2>
- <p className="text-xs text-slate-400">Select a specialist for ticket triage routing</p>
+ <h2 className="text-base font-bold text-white">Triage and Assign Ticket</h2>
+ <p className="text-xs text-slate-400">Confirm priority, SLA, and responsible technician</p>
  </div>
  </div>
 
@@ -58,6 +63,17 @@ export const TriageAssignModal: React.FC<TriageAssignModalProps> = ({ ticketId, 
  <span>{errorMsg}</span>
  </div>
  )}
+
+ <div className="space-y-2 text-xs">
+ <div className="flex items-center justify-between text-slate-400"><span>System recommendation</span><span className="font-mono font-bold text-blue-400">{suggestedPriority}</span></div>
+ <label className="block font-semibold text-slate-300">Final Priority</label>
+ <select value={finalPriority} onChange={(event) => setFinalPriority(event.target.value as TicketPriority)} className="w-full bg-[#090d16] border border-slate-800 text-slate-100 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+ <option value="LOW">LOW - 72 hour SLA</option>
+ <option value="MEDIUM">MEDIUM - 24 hour SLA</option>
+ <option value="HIGH">HIGH - 8 hour SLA</option>
+ <option value="CRITICAL">CRITICAL - 4 hour SLA</option>
+ </select>
+ </div>
 
  <div className="space-y-2 max-h-60 overflow-y-auto">
  {isLoading ? (
@@ -102,7 +118,7 @@ export const TriageAssignModal: React.FC<TriageAssignModalProps> = ({ ticketId, 
  className="w-1/2"
  disabled={!selectedTechId}
  isLoading={assignMutation.isPending}
- onClick={() => assignMutation.mutate(selectedTechId)}
+ onClick={() => assignMutation.mutate()}
  >
  Confirm Assignment
  </Button>

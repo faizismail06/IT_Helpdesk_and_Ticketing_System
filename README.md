@@ -1,207 +1,277 @@
-# Enterprise IT Helpdesk & Ticketing System
+# IT Helpdesk and Ticketing System
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)](https://expressjs.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io/)
+Aplikasi internal untuk menerima laporan masalah IT, melakukan triage, mendistribusikan tiket kepada teknisi, mencatat komunikasi dan waktu kerja, mengonfirmasi resolusi, serta mengekspor laporan operasional.
 
-> An enterprise-grade, real-time IT Service Desk & Ticket Management platform engineered with strict TypeScript typing, state-machine ticket workflows, live Socket.IO notification engines, SLA countdown enforcement, Knowledge Base deflection, and complete audit logging.
+Project ini menggunakan frontend dan backend terpisah. Ini bukan Next.js.
 
----
+## Dokumentasi
 
-## Key Features & Technical Highlights
+- [Workflow dan RBAC](docs/WORKFLOW.md)
+- [Referensi REST API](docs/API.md)
+- [Setup, testing, dan troubleshooting](docs/DEVELOPMENT.md)
+- [Product Requirements Document](PRD.md)
 
-- ⏱ **Realtime SLA Countdown & Overdue Engine**: Dynamic SLA deadline calculations based on ticket priority (`CRITICAL`: 2h, `HIGH`: 4h, `MEDIUM`: 24h, `LOW`: 48h) with live ticking countdown meters and auto-overdue flag detection.
-- **Strict Ticket State-Machine Workflow**: Enforces invalid transition prevention (`NEW` -> `OPEN` -> `IN_PROGRESS` -> `PENDING` -> `RESOLVED` -> `CLOSED` / `REOPENED`).
-- **Real-Time Websocket Notifications**: Socket.IO connection with JWT handshake and targeted room delivery (`user_{id}`, `ticket_{id}`, `role_helpdesk`) for immediate assignment & status updates.
-- **Enterprise Auto-Numbering**: Transaction-safe unique ticket format (`IT-YYYY-XXXXXX`) generated automatically on submission.
-- **Role-Based Access Control (RBAC)**: 4 specialized user roles (*Employee*, *Helpdesk*, *Technician*, *Admin*) with distinct interfaces, actions, and data visibility rules.
-- **Smart Knowledge Base Deflection**: Auto-suggests relevant KB articles during ticket creation to reduce helpdesk volume before submission.
-- **Role-Protected Thread & Internal Notes**: Support for public requester communication alongside IT-restricted internal notes.
-- **Visual Analytics & Data Exporter**: Recharts integration for priority/category distribution charts and 1-click CSV/Excel report exporter.
-- **Full Audit Logging**: Automated tracking of all system actions (status updates, assignments, user creations, SLA rule changes) with requester IP and metadata payload.
+## Fitur Utama
 
----
+- Autentikasi JWT dengan role Employee, Helpdesk, Technician, dan Admin.
+- Lifecycle tiket dengan transisi status yang divalidasi backend.
+- Nomor tiket otomatis dengan format `IT-YYYY-XXXXXX`.
+- Impact dan urgency diisi Employee; suggested priority dihitung sistem.
+- Final priority, SLA, dan technician ditentukan Helpdesk saat triage.
+- Public reply, internal IT note, history, dan work time.
+- Notifikasi tersimpan dan pembaruan real-time melalui Socket.IO.
+- Dashboard khusus setiap role.
+- Knowledge Base untuk Employee dengan pencarian kontekstual; kontennya dikelola Admin.
+- Attachment tiket tervalidasi dengan kontrol akses upload, download, dan delete.
+- Employee dapat mengedit atau membatalkan tiket selama masih berstatus `NEW`.
+- SLA overdue diperbarui otomatis oleh monitor backend.
+- Rating 1-5 khusus requester Employee setelah resolved/closed.
+- Rating terlihat pada detail bagi requester, assigned technician, Helpdesk, dan Admin yang memiliki akses tiket.
+- Report Helpdesk/Admin dengan ekspor `.xlsx` sebagai Excel Table.
+- Administrasi user, aturan SLA, dan audit log.
 
-## System Architecture
+## Teknologi
 
-```mermaid
-graph TD
- User([User Browser]) <--> ReactApp[Vite React + TS Single-Page App]
- 
- subgraph REST & Websocket API Layer
- ReactApp <-->|HTTP REST / API v1| ExpressServer[Express.js Node.js Server]
- ReactApp <-->|Websocket WS| SocketEngine[Socket.IO Gateway Engine]
- end
+| Layer | Teknologi |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 6, React Router, TanStack Query |
+| UI/data | Tailwind CSS, Lucide, Recharts, React Hook Form, Zod, Axios |
+| Excel | ExcelJS |
+| Backend | Node.js, Express 4, TypeScript, Socket.IO |
+| Data | PostgreSQL, Prisma ORM 6 |
+| Security | JWT, bcryptjs, Helmet, CORS, rate limiter |
+| Test | Jest, Supertest |
 
- subgraph Security & Middleware
- ExpressServer --> AuthGuard[JWT Authentication Guard]
- ExpressServer --> RoleGuard[RBAC Permission Guard]
- ExpressServer --> UploadGuard[Multer Attachment Validator]
- end
+## Arsitektur
 
- subgraph Business Logic Core
- ExpressServer --> TicketEngine[Ticket & Workflow Service]
- ExpressServer --> SLAEngine[SLA Rules Engine]
- ExpressServer --> KBEngine[Knowledge Base & Deflection Service]
- ExpressServer --> AuditEngine[Audit Log Service]
- end
-
- subgraph Persistence Layer
- TicketEngine <--> PrismaORM[Prisma ORM]
- SLAEngine <--> PrismaORM
- KBEngine <--> PrismaORM
- AuditEngine <--> PrismaORM
- PrismaORM <--> Database[(PostgreSQL Database)]
- end
+```text
+Browser
+  | HTTP/JSON + Socket.IO
+  v
+React + Vite (localhost:5175)
+  |
+  v
+Express REST API (localhost:5002/api/v1)
+  |
+  v
+Prisma ORM -> PostgreSQL (localhost:5432)
 ```
 
----
+Backend:
 
-## Database Entity-Relationship Diagram (ERD)
-
-```mermaid
-erDiagram
- User ||--o{ Ticket : "creates (requester)"
- User ||--o{ Ticket : "assigned (technician)"
- User ||--o{ TicketComment : "authors"
- User ||--o{ TicketHistory : "triggers"
- User ||--o{ Notification : "receives"
- User ||--o{ AuditLog : "executes"
- Department ||--o{ User : "belongs to"
- Category ||--o{ Ticket : "categorizes"
- Category ||--o{ KnowledgeBase : "groups"
- Ticket ||--o{ TicketComment : "contains"
- Ticket ||--o{ TicketHistory : "logs transition"
- Ticket ||--o{ Attachment : "includes"
- Ticket ||--o{ Rating : "receives feedback"
- SlaRule ||--o{ Ticket : "applies SLA"
-
- User {
- string id PK
- string email UK
- string password
- string fullName
- string role "EMPLOYEE | HELPDESK | TECHNICIAN | ADMIN"
- boolean isActive
- }
-
- Ticket {
- string id PK
- string ticketNumber UK "IT-YYYY-XXXXXX"
- string subject
- string description
- string status "NEW | OPEN | IN_PROGRESS | PENDING | RESOLVED | CLOSED | REOPENED"
- string priority "LOW | MEDIUM | HIGH | CRITICAL"
- datetime slaDueDate
- boolean isOverdue
- }
-
- SlaRule {
- string id PK
- string priority UK
- int resolutionHours
- }
-
- KnowledgeBase {
- string id PK
- string title
- string content
- int helpfulCount
- }
+```text
+routes -> middleware -> controllers -> services -> Prisma -> PostgreSQL
 ```
 
----
+Frontend:
 
-## Demo Access Credentials
-
-The database comes pre-seeded with ready-to-use role credentials for immediate evaluation:
-
-| Role | Email | Password | Access Rights |
-| :--- | :--- | :--- | :--- |
-| **Admin** | `admin@enterprise.com` | `password123` | Full access: User management, SLA rule editor, audit logs, reports & system configuration. |
-| **Helpdesk Agent** | `helpdesk@enterprise.com` | `password123` | Triage queue, ticket assignment, status updates, reports, internal notes. |
-| **Technician** | `technician@enterprise.com` | `password123` | Workstation queue, ticket resolution, customer comments, internal technical notes. |
-| **Employee** | `employee@enterprise.com` | `password123` | Ticket creation with KB deflection, ticket tracking, 5-star resolution rating. |
-
----
-
-## API Endpoint Documentation Summary
-
-### Auth Module (`/api/v1/auth`)
-- `POST /login` - Authenticate user credentials and return JWT token + profile info.
-- `GET /me` - Retrieve current authenticated user profile.
-
-### Tickets Core (`/api/v1/tickets`)
-- `GET /` - List tickets with filtering (search, status, priority, category, pagination).
-- `POST /` - Create a new ticket (auto-generates `IT-YYYY-XXXXXX` number & SLA deadline).
-- `GET /:id` - Get ticket details including comments, history, attachments, and ratings.
-- `POST /:id/comments` - Post public comment or IT internal note.
-- `PATCH /:id/status` - Transition ticket status (validates state machine rules).
-- `PATCH /:id/assign` - Assign or re-assign ticket to a technician.
-
-### Knowledge Base (`/api/v1/kb`)
-- `GET /` - List published KB articles or search by keyword.
-- `GET /deflect?query=...` - Auto-suggest relevant KB articles for title keywords.
-
-### Admin & SLA Engine (`/api/v1/admin` & `/api/v1/sla-rules`)
-- `GET /admin/users` - Fetch user directory.
-- `POST /admin/users` - Create a new user account.
-- `PATCH /users/:id/status` - Activate or deactivate user access.
-- `GET /sla-rules` - Retrieve SLA resolution hours per priority.
-- `PUT /sla-rules/:id` - Update SLA target resolution hours.
-- `GET /admin/audit-logs` - Retrieve detailed audit trail entries.
-
----
-
-## Quickstart Local Installation Guide
-
-### Prerequisites
-- **Node.js**: `v18.0.0` or higher
-- **PostgreSQL**: Local instance running on port `5432`
-
-### 1. Clone & Configure Environment
-
-```bash
-git clone https://github.com/your-username/IT_Helpdesk_and_Ticketing_System.git
-cd IT_Helpdesk_and_Ticketing_System
+```text
+pages/components -> API modules -> Axios -> REST API
+                 -> TanStack Query cache
+                 -> Socket.IO invalidation
 ```
 
-Configure `backend/.env`:
+## Struktur Project
+
+```text
+IT_Helpdesk_and_Ticketing_System/
+|-- backend/
+|   |-- prisma/                 # schema, migration, seed
+|   `-- src/
+|       |-- controllers/
+|       |-- middlewares/
+|       |-- routes/
+|       |-- services/
+|       |-- socket/
+|       |-- utils/
+|       |-- validators/
+|       `-- __tests__/
+|-- frontend/
+|   `-- src/
+|       |-- api/
+|       |-- components/
+|       |-- contexts/
+|       |-- layouts/
+|       |-- pages/
+|       |-- routes/
+|       `-- types/
+|-- docs/
+|-- docker-compose.yml
+|-- PRD.md
+`-- README.md
+```
+
+## Role dan Akses Ringkas
+
+| Fitur | Employee | Helpdesk | Technician | Admin |
+|---|:---:|:---:|:---:|:---:|
+| Submit tiket | Ya | Tidak | Tidak | Tidak |
+| Melihat tiket | Milik sendiri | Semua | Ditugaskan/milik sendiri | Semua |
+| Triage dan assignment | Tidak | Ya | Tidak | Ya |
+| Mengerjakan tiket | Tidak | Ya | Ditugaskan | Ya |
+| Public reply | Tiket sendiri | Ya | Ditugaskan | Ya |
+| Internal note | Tidak | Ya | Ditugaskan | Ya |
+| Close/reopen | Tiket sendiri | Ya | Tidak | Ya |
+| Rating | Tiket sendiri | Tidak | Tidak | Tidak |
+| Knowledge Base | Baca | Tidak | Tidak | Tidak |
+| Report dan Excel | Tidak | Ya | Tidak | Ya |
+| Administrasi | Tidak | Tidak | Tidak | Ya |
+
+Admin mengelola kategori dan artikel Knowledge Base melalui menu `Categories & Knowledge`.
+
+Rincian lengkap terdapat di [docs/WORKFLOW.md](docs/WORKFLOW.md).
+
+## Quick Start
+
+### Prasyarat
+
+- Node.js 18 atau lebih baru.
+- npm.
+- PostgreSQL 15 atau versi kompatibel.
+- Database `it_helpdesk_db`.
+
+### Backend
+
+```powershell
+cd backend
+Copy-Item .env.example .env
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run seed
+npm run dev
+```
+
+Sesuaikan `backend/.env`:
+
 ```env
 PORT=5002
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/it_helpdesk_db?schema=public"
-JWT_SECRET="your-super-secret-jwt-key"
+JWT_SECRET="replace-with-a-long-random-secret"
+JWT_EXPIRES_IN="24h"
 CORS_ORIGIN="http://localhost:5175"
+FRONTEND_URL="http://localhost:5175"
+MAX_FILE_SIZE=5242880
 ```
 
-### 2. Setup Backend Database & Run
+Backend tersedia di `http://localhost:5002`.
 
-```bash
-cd backend
-npm install
-npx prisma migrate dev --name init
-npx prisma db seed
-npm run dev
-```
-*Backend will start on `http://localhost:5002`*
+### Frontend
 
-### 3. Setup Frontend & Run
+Buka terminal baru:
 
-In a new terminal window:
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
-*Frontend will start on `http://localhost:5175`*
 
----
+Frontend tersedia di `http://localhost:5175`.
 
-## Tech Stack Summary
+Konfigurasi frontend opsional (`frontend/.env`):
 
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS / Vanilla CSS, Lucide Icons, Recharts, React Query, Socket.IO Client.
-- **Backend**: Node.js, Express.js, TypeScript, Prisma ORM, PostgreSQL, Socket.IO, JWT, BcryptJS, Zod Validation, Multer.
+```env
+VITE_API_URL=http://localhost:5002/api/v1
+VITE_SOCKET_URL=http://localhost:5002
+```
+
+## Akun Seed
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@company.com` | `Admin123!` |
+| Helpdesk | `helpdesk@company.com` | `Helpdesk123!` |
+| Technician | `technician.ahmad@company.com` | `Tech123!` |
+| Technician | `technician.siti@company.com` | `Tech123!` |
+| Employee | `budi.employee@company.com` | `User123!` |
+
+Kredensial ini hanya untuk development/demo.
+
+## Lifecycle Tiket
+
+```text
+Employee submit -> NEW
+Helpdesk triage + priority + assignment -> OPEN
+Technician mulai bekerja -> IN_PROGRESS
+Menunggu input -> PENDING -> IN_PROGRESS
+Technician mengirim solusi -> RESOLVED
+Employee menerima solusi -> CLOSED
+Employee menolak solusi -> REOPENED -> IN_PROGRESS
+```
+
+Employee tidak menentukan final priority. Employee mengisi `impact` dan `urgency`; sistem menghasilkan `suggestedPriority`. Helpdesk menerima atau mengubah rekomendasi saat assignment. SLA dihitung ulang dari waktu tiket dibuat menggunakan final priority.
+
+## SLA Default
+
+| Priority | Target resolusi |
+|---|---:|
+| `CRITICAL` | 4 jam |
+| `HIGH` | 8 jam |
+| `MEDIUM` | 24 jam |
+| `LOW` | 72 jam |
+
+Nilai dibuat oleh seed dan dapat diubah Admin.
+
+## Script
+
+### Backend
+
+| Command | Fungsi |
+|---|---|
+| `npm run dev` | API dengan reload otomatis |
+| `npm run build` | Compile TypeScript ke `dist/` |
+| `npm start` | Menjalankan build production |
+| `npm test` | Jest integration tests |
+| `npm run prisma:generate` | Generate Prisma Client |
+| `npm run prisma:migrate` | Migration development |
+| `npm run seed` | Seed akun, kategori, SLA, dan artikel |
+
+### Frontend
+
+| Command | Fungsi |
+|---|---|
+| `npm run dev` | Vite dev server |
+| `npm run build` | Type-check dan production build |
+| `npm run preview` | Preview hasil build |
+
+## Testing
+
+Integration test mencakup login, RBAC negatif, submit, suggested priority, queue Helpdesk, triage, assignment, pembatasan technician, internal note, resolution, close, dan rating.
+
+```powershell
+cd backend
+npm test
+```
+
+## Export Excel
+
+Helpdesk dan Admin dapat mengekspor `.xlsx` asli yang berisi Excel Table `HelpdeskTickets`, header filter, frozen header, alternating rows, text wrapping, serta data impact, urgency, priority, SLA, work time, dan rating.
+
+## Catatan Operasional
+
+- Monitor SLA berjalan setiap 60 detik secara default; atur `SLA_CHECK_INTERVAL_MS` bila diperlukan.
+- Report Excel dibuat di browser dan tidak disimpan server.
+- Attachment disimpan di direktori lokal `backend/uploads`; production sebaiknya memakai object storage dan antivirus scanning.
+
+## Keamanan
+
+- Password di-hash dengan bcryptjs.
+- Endpoint privat membutuhkan bearer token JWT.
+- Authorization role diterapkan di backend dan route frontend.
+- Internal notes difilter backend dari Employee.
+- Technician hanya dapat mengakses tiket aktif yang ditugaskan kepadanya.
+- Ganti JWT secret, password database, dan akun seed sebelum deployment.
+
+## Troubleshooting Singkat
+
+Port `5002` digunakan:
+
+```powershell
+Get-NetTCPConnection -LocalPort 5002 -State Listen
+```
+
+Prisma Client terkunci di Windows: hentikan backend sebelum menjalankan `npx prisma generate`.
+
+Dashboard kosong: periksa backend, migration, seed, token, dan URL API frontend.
+
+Panduan rinci terdapat di [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

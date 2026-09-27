@@ -1,14 +1,23 @@
 import { z } from 'zod';
-import { TicketStatus } from '@prisma/client';
+import { TicketPriority, TicketStatus } from '@prisma/client';
 
 export const statusTransitionSchema = z.object({
  status: z.nativeEnum(TicketStatus),
  reason: z.string().optional(),
  workTimeMins: z.coerce.number().min(0).optional().default(0),
+}).superRefine((input, ctx) => {
+ if (input.status === TicketStatus.RESOLVED && !input.reason?.trim()) {
+ ctx.addIssue({
+ code: z.ZodIssueCode.custom,
+ path: ['reason'],
+ message: 'Resolution details are required when resolving a ticket',
+ });
+ }
 });
 
 export const assignTicketSchema = z.object({
  technicianId: z.string().uuid('Invalid technician ID'),
+ priority: z.nativeEnum(TicketPriority),
 });
 
 export const addCommentSchema = z.object({

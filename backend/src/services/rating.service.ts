@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { JwtPayload } from '../types';
+import { AuditLogService } from './auditLog.service';
 
 export class RatingService {
  static async submitRating(
@@ -26,7 +27,7 @@ export class RatingService {
  throw { statusCode: 400, message: 'Rating has already been submitted for this ticket' };
  }
 
- return prisma.ticketRating.create({
+ const rating = await prisma.ticketRating.create({
  data: {
  ticketId,
  userId: user.userId,
@@ -34,5 +35,7 @@ export class RatingService {
  feedback,
  },
  });
+ await AuditLogService.logAction(user.userId, 'Requester submitted support rating', 'TICKET', ticketId, { score: rating.score });
+ return rating;
  }
 }

@@ -2,6 +2,7 @@ import { prisma } from '../config/db';
 import { comparePassword, hashPassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { LoginInput, ChangePasswordInput } from '../validators/auth.validator';
+import { AuditLogService } from './auditLog.service';
 
 export class AuthService {
  static async login(input: LoginInput) {
@@ -28,6 +29,8 @@ export class AuthService {
 
  // Exclude passwordHash from returned user object
  const { passwordHash, ...userWithoutPassword } = user;
+
+ await AuditLogService.logAction(user.id, 'User logged in', 'AUTH', user.id);
 
  return {
  token,
@@ -78,6 +81,8 @@ export class AuthService {
  where: { id: userId },
  data: { passwordHash: newHash },
  });
+
+ await AuditLogService.logAction(userId, 'User changed password', 'AUTH', userId);
 
  return true;
  }

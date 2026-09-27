@@ -24,6 +24,7 @@ import { KnowledgeBasePage } from './pages/knowledgeBase/KnowledgeBasePage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { SlaRulesPage } from './pages/admin/SlaRulesPage';
+import { ContentManagementPage } from './pages/admin/ContentManagementPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 
 const queryClient = new QueryClient({
@@ -50,7 +51,9 @@ export const App: React.FC = () => {
  <Route element={<ProtectedRoute allowedRoles={['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN']} />}>
  <Route element={<AppLayout />}>
  {/* Employee Dashboard */}
- <Route path="/employee" element={<EmployeeDashboard />} />
+ <Route path="/employee" element={<ProtectedRoute allowedRoles={['EMPLOYEE']} />}>
+ <Route index element={<EmployeeDashboard />} />
+ </Route>
 
  {/* Helpdesk Dashboard */}
  <Route path="/helpdesk" element={<ProtectedRoute allowedRoles={['HELPDESK', 'ADMIN']} />}>
@@ -68,6 +71,7 @@ export const App: React.FC = () => {
  <Route path="users" element={<AdminUsersPage />} />
  <Route path="sla" element={<SlaRulesPage />} />
  <Route path="audit" element={<AuditLogsPage />} />
+ <Route path="content" element={<ContentManagementPage />} />
  </Route>
 
  {/* Reports & Export */}
@@ -77,11 +81,15 @@ export const App: React.FC = () => {
 
  {/* Ticket Core Engine Routes */}
  <Route path="/tickets" element={<TicketListPage />} />
- <Route path="/tickets/new" element={<CreateTicketPage />} />
+ <Route path="/tickets/new" element={<ProtectedRoute allowedRoles={['EMPLOYEE']} />}>
+ <Route index element={<CreateTicketPage />} />
+ </Route>
  <Route path="/tickets/:id" element={<TicketDetailPage />} />
 
  {/* Knowledge Base Route */}
- <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+ <Route path="/knowledge-base" element={<ProtectedRoute allowedRoles={['EMPLOYEE']} />}>
+ <Route index element={<KnowledgeBasePage />} />
+ </Route>
  </Route>
  </Route>
 

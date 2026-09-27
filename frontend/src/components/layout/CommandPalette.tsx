@@ -29,8 +29,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
  const actions = [
  { id: 'dash', label: 'Go to Dashboard', icon: BarChart3, path: `/${user?.role?.toLowerCase()}`, roles: ['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN'] },
  { id: 'tickets', label: 'View Ticket Queue', icon: Ticket, path: '/tickets', roles: ['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN'] },
- { id: 'new-ticket', label: 'Create New Ticket', icon: Ticket, path: '/tickets/new', roles: ['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN'] },
- { id: 'kb', label: 'Browse Knowledge Base', icon: BookOpen, path: '/knowledge-base', roles: ['EMPLOYEE', 'HELPDESK', 'TECHNICIAN', 'ADMIN'] },
+ { id: 'new-ticket', label: 'Create New Ticket', icon: Ticket, path: '/tickets/new', roles: ['EMPLOYEE'] },
+ { id: 'kb', label: 'Browse Knowledge Base', icon: BookOpen, path: '/knowledge-base', roles: ['EMPLOYEE'] },
  { id: 'reports', label: 'System Reports & Export', icon: BarChart3, path: '/reports', roles: ['HELPDESK', 'ADMIN'] },
  { id: 'users', label: 'User & Role Administration', icon: Users, path: '/admin/users', roles: ['ADMIN'] },
  { id: 'sla', label: 'SLA Rules Engine Setup', icon: Settings, path: '/admin/sla', roles: ['ADMIN'] },
